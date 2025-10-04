@@ -21,6 +21,9 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role',
+        'user_id',
+        'is_active',
     ];
 
     /**
@@ -43,6 +46,58 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
+    }
+
+    /**
+     * Relationships
+     */
+    public function profile()
+    {
+        return $this->hasOne(UserProfile::class);
+    }
+
+    public function advisedStudents()
+    {
+        return $this->hasMany(UserProfile::class, 'advisor_id');
+    }
+
+    public function courseRegistrations()
+    {
+        return $this->hasMany(CourseRegistration::class, 'student_id');
+    }
+
+    public function approvals()
+    {
+        return $this->hasMany(RegistrationApproval::class, 'approver_id');
+    }
+
+    public function paymentSlips()
+    {
+        return $this->hasMany(PaymentSlip::class, 'student_id');
+    }
+
+    /**
+     * Helper methods
+     */
+    public function isStudent()
+    {
+        return $this->role === 'student';
+    }
+
+    public function isAdvisor()
+    {
+        return $this->role === 'advisor';
+    }
+
+    public function isDepartmentHead()
+    {
+        return $this->role === 'department_head';
+    }
+
+    public function isAuthority()
+    {
+        return $this->role === 'authority';
     }
 }
