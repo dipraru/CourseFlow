@@ -19,17 +19,33 @@
             @include('layouts.navigation')
 
             <!-- Page Heading -->
-            @isset($header)
+            {{-- Support both component usage (<x-app-layout>) which provides $header/$slot
+                 and traditional blade sections (@section('header'), @section('content')) --}}
+            @if(isset($header))
                 <header class="bg-white shadow">
                     <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                        {{-- $header when layout used as component --}}
                         {{ $header }}
                     </div>
                 </header>
-            @endisset
+            @elseif(View::hasSection('header'))
+                <header class="bg-white shadow">
+                    <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                        {{-- section('header') when using @section --}}
+                        @yield('header')
+                    </div>
+                </header>
+            @endif
 
             <!-- Page Content -->
             <main>
-                {{ $slot }}
+                @if(isset($slot))
+                    {{-- component slot content --}}
+                    {!! $slot !!}
+                @else
+                    {{-- traditional section content --}}
+                    @yield('content')
+                @endif
             </main>
         </div>
     </body>
