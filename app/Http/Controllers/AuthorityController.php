@@ -81,6 +81,23 @@ class AuthorityController extends Controller
                 'semester_start_date', 'semester_end_date', 'is_current'
             ]);
 
+            // If marked current, also mark as active for registration availability
+            if (!empty($data['is_current'])) {
+                $data['is_active'] = true;
+            }
+
+            // Auto-enable is_active if today's date falls within registration window
+            try {
+                $today = now()->toDateString();
+                if (!empty($data['registration_start_date']) && !empty($data['registration_end_date'])) {
+                    if ($data['registration_start_date'] <= $today && $today <= $data['registration_end_date']) {
+                        $data['is_active'] = true;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // ignore date parse errors
+            }
+
             $createdSemester = Semester::create($data);
 
             // If courses were selected, attach them as SemesterCourse entries
@@ -139,6 +156,23 @@ class AuthorityController extends Controller
                 'semester_start_date', 'semester_end_date', 'is_current'
             ]);
 
+            // If semester is being marked current, also mark active
+            if (!empty($data['is_current'])) {
+                $data['is_active'] = true;
+            }
+
+            // Auto-enable is_active if today's date falls within registration window
+            try {
+                $today = now()->toDateString();
+                if (!empty($data['registration_start_date']) && !empty($data['registration_end_date'])) {
+                    if ($data['registration_start_date'] <= $today && $today <= $data['registration_end_date']) {
+                        $data['is_active'] = true;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // ignore date parse errors
+            }
+
             $semester->update($data);
 
             // If courses were sent during update, sync semester courses (simple approach: remove existing and add new)
@@ -169,8 +203,8 @@ class AuthorityController extends Controller
     {
         DB::beginTransaction();
         try {
-            // Set this semester as current without unsetting others (allow multiple current semesters)
-            $semester->update(['is_current' => true]);
+            // Set this semester as current and active (allow multiple current semesters)
+            $semester->update(['is_current' => true, 'is_active' => true]);
             DB::commit();
             return back()->with('success', 'Semester marked as current successfully.');
         } catch (\Exception $e) {

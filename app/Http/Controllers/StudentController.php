@@ -15,7 +15,22 @@ class StudentController extends Controller
         $student = auth()->user();
         
         // Get current semester
-        $currentSemester = Semester::where('is_active', true)->first();
+        // Prefer semesters where today falls within the registration window
+        $today = now()->toDateString();
+        $currentSemester = Semester::whereDate('registration_start_date', '<=', $today)
+            ->whereDate('registration_end_date', '>=', $today)
+            ->first();
+
+        // Fallback to any active semester (legacy behavior)
+        if (! $currentSemester) {
+            $currentSemester = Semester::where('is_active', true)->first();
+        }
+
+        // Provide legacy-friendly property names used in blades
+        if ($currentSemester) {
+            $currentSemester->registration_start = $currentSemester->registration_start_date;
+            $currentSemester->registration_end = $currentSemester->registration_end_date;
+        }
         
         // Get student's registrations for current semester
         $registrations = CourseRegistration::with(['semesterCourse.course', 'semester'])
@@ -58,7 +73,15 @@ class StudentController extends Controller
         $student = auth()->user();
         
         // Get active semester
-        $activeSemester = Semester::where('is_active', true)->first();
+        // Prefer registration-window based semester
+        $today = now()->toDateString();
+        $activeSemester = Semester::whereDate('registration_start_date', '<=', $today)
+            ->whereDate('registration_end_date', '>=', $today)
+            ->first();
+
+        if (! $activeSemester) {
+            $activeSemester = Semester::where('is_active', true)->first();
+        }
         
         if (!$activeSemester) {
             return redirect()->route('student.dashboard')
@@ -80,6 +103,10 @@ class StudentController extends Controller
         
     // Provide $currentSemester for the view (legacy var name used in blade)
     $currentSemester = $activeSemester;
+    if ($currentSemester) {
+        $currentSemester->registration_start = $currentSemester->registration_start_date;
+        $currentSemester->registration_end = $currentSemester->registration_end_date;
+    }
 
     return view('student.courses', compact('activeSemester', 'availableCourses', 'registeredCourseIds', 'currentSemester'));
     }
