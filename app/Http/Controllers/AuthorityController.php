@@ -382,6 +382,56 @@ class AuthorityController extends Controller
             return back()->with('error', 'Failed to create user.')->withInput();
         }
     }
+
+    public function editUser(User $user)
+    {
+        $batches = Batch::all();
+        $advisors = User::where('role', 'advisor')->get();
+        return view('authority.users.edit', compact('user', 'batches', 'advisors'));
+    }
+
+    public function updateUser(Request $request, User $user)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email,' . $user->id,
+            'role' => 'required|in:student,advisor,department_head,authority',
+            'student_id' => 'nullable|string',
+            'phone' => 'nullable|string|max:20',
+            'batch_id' => 'nullable|exists:batches,id',
+            'advisor_id' => 'nullable|exists:users,id',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $user->update($request->only(['name', 'email', 'role']));
+
+            if ($request->role === 'student') {
+                $profileData = [
+                    'student_id' => $request->student_id,
+                    'phone' => $request->phone,
+                    'batch_id' => $request->batch_id,
+                    'advisor_id' => $request->advisor_id,
+                ];
+                if ($user->profile) {
+                    $user->profile->update($profileData);
+                } else {
+                    $user->profile()->create($profileData);
+                }
+            } else {
+                // Remove student profile if role changed away from student
+                if ($user->profile) {
+                    $user->profile()->delete();
+                }
+            }
+
+            DB::commit();
+            return redirect()->route('authority.users')->with('success', 'User updated successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to update user.')->withInput();
+        }
+    }
     
     // Fee Management
     public function fees()
@@ -396,6 +446,39 @@ class AuthorityController extends Controller
         $batches = Batch::all();
         $semesters = Semester::all();
         return view('authority.fees.create', compact('batches', 'semesters'));
+    }
+
+    public function editFee(Fee $fee)
+    {
+        $batches = Batch::all();
+        $semesters = Semester::all();
+        return view('authority.fees.edit', compact('fee', 'batches', 'semesters'));
+    }
+
+    public function updateFee(Request $request, Fee $fee)
+    {
+        $request->validate([
+            'semester_id' => 'required|exists:semesters,id',
+            'per_credit_fee' => 'required|numeric|min:0',
+            'admission_fee' => 'nullable|numeric|min:0',
+            'lab_fee' => 'nullable|numeric|min:0',
+            'library_fee' => 'nullable|numeric|min:0',
+            'other_fees' => 'nullable|numeric|min:0',
+            'fee_description' => 'nullable|string',
+        ]);
+
+        $fee->update([
+            'semester_id' => $request->semester_id,
+            'per_credit_fee' => $request->per_credit_fee,
+            'admission_fee' => $request->admission_fee ?? 0,
+            'lab_fee' => $request->lab_fee ?? 0,
+            'library_fee' => $request->library_fee ?? 0,
+            'other_fees' => $request->other_fees ?? 0,
+            'fee_description' => $request->fee_description,
+            'is_active' => $request->has('is_active') ? (bool)$request->is_active : $fee->is_active,
+        ]);
+
+        return redirect()->route('authority.fees')->with('success', 'Fee updated successfully.');
     }
     
     public function storeFee(Request $request)
