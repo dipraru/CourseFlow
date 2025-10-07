@@ -67,7 +67,7 @@
                                         </td>
                                             <td>
                                                 <a href="{{ route('authority.semesters.registrations', $semester) }}" class="btn btn-sm btn-outline-primary">
-                                                    Registrations ({{ $semester->course_registrations_count ?? 0 }})
+                                                    Registrations ({{ $semester->student_registrations_count ?? 0 }})
                                                 </a>
                                             </td>
                                             <td class="text-end">
@@ -81,7 +81,7 @@
                                                 <span class="badge bg-success">Current</span>
                                             @endif
 
-                                            @php $regCount = $semester->course_registrations_count ?? 0; @endphp
+                                            @php $regCount = $semester->student_registrations_count ?? 0; @endphp
                                             <form action="{{ route('authority.semesters.destroy', $semester) }}" method="POST" class="d-inline ms-2">
                                                 @csrf
                                                 @method('DELETE')

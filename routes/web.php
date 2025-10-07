@@ -84,11 +84,15 @@ Route::middleware(['auth', 'role:authority'])->prefix('authority')->name('author
     // User Management
     Route::get('/users', [AuthorityController::class, 'users'])->name('users');
     Route::get('/users/create', [AuthorityController::class, 'createUser'])->name('users.create');
+    Route::get('/users/{user}/edit', [AuthorityController::class, 'editUser'])->name('users.edit');
+    Route::patch('/users/{user}', [AuthorityController::class, 'updateUser'])->name('users.update');
     Route::post('/users', [AuthorityController::class, 'storeUser'])->name('users.store');
     
     // Fee Management
     Route::get('/fees', [AuthorityController::class, 'fees'])->name('fees');
     Route::get('/fees/create', [AuthorityController::class, 'createFee'])->name('createFee');
+    Route::get('/fees/{fee}/edit', [AuthorityController::class, 'editFee'])->name('fees.edit');
+    Route::patch('/fees/{fee}', [AuthorityController::class, 'updateFee'])->name('fees.update');
     Route::post('/fees', [AuthorityController::class, 'storeFee'])->name('fees.store');
     
     // Payment Verification

@@ -17,21 +17,29 @@
                     <thead>
                         <tr>
                             <th>Student</th>
-                            <th>Course</th>
+                            <th>Courses</th>
                             <th>Status</th>
                             <th>Date</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($registrations as $reg)
+                        @foreach($registrations as $app)
                             <tr>
                                 <td>
-                                    <strong>{{ optional($reg->student)->name }}</strong><br>
-                                    <small class="text-muted">{{ optional($reg->student)->email }}</small>
+                                    <strong>{{ optional($app->student)->name }}</strong><br>
+                                    <small class="text-muted">{{ optional($app->student)->email }}</small>
                                 </td>
-                                <td>{{ optional($reg->semesterCourse->course)->course_code }} - {{ optional($reg->semesterCourse->course)->course_name }}</td>
-                                <td>{{ ucfirst($reg->status) }}</td>
-                                <td>{{ $reg->applied_at->format('M d, Y') }}</td>
+                                <td>
+                                    @foreach($app->courses as $c)
+                                        <div>{{ $c->course_code }} - {{ $c->course_name }}</div>
+                                    @endforeach
+                                </td>
+                                <td>{{ ucfirst($app->status) }}</td>
+                                <td>
+                                    {{-- show earliest applied_at among the registrations for this application --}}
+                                    @php $earliest = $app->registrations->min('applied_at'); @endphp
+                                    {{ $earliest ? \Carbon\Carbon::parse($earliest)->format('M d, Y') : '-' }}
+                                </td>
                             </tr>
                         @endforeach
                     </tbody>

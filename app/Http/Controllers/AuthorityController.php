@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\Semester;
 use App\Models\Course;
 use App\Models\SemesterCourse;
+use App\Models\CourseRegistration;
 use App\Models\Fee;
 use App\Models\PaymentSlip;
 use App\Models\Batch;
@@ -40,8 +41,11 @@ class AuthorityController extends Controller
     // Semester Management
     public function semesters()
     {
-        // Include counts for semester courses and any student registrations so we can show & guard deletion
-        $semesters = Semester::withCount(['semesterCourses', 'courseRegistrations'])->latest()->paginate(15);
+        // Include counts for semester courses and distinct student registrations (one student = one registration)
+        $semesters = Semester::select('semesters.*', DB::raw('(select count(distinct student_id) from course_registrations where course_registrations.semester_id = semesters.id) as student_registrations_count'))
+            ->withCount(['semesterCourses'])
+            ->latest()
+            ->paginate(15);
         return view('authority.semesters.index', compact('semesters'));
     }
     
@@ -234,8 +238,49 @@ class AuthorityController extends Controller
 
     public function semesterRegistrations(Semester $semester)
     {
-        $registrations = $semester->courseRegistrations()->with(['semesterCourse.course', 'student.profile'])->latest()->paginate(25);
-        return view('authority.semesters.registrations', compact('semester', 'registrations'));
+        // Group registrations by student (one application per student per semester)
+        $studentApplications = CourseRegistration::where('semester_id', $semester->id)
+            ->with(['semesterCourse.course', 'student.profile'])
+            ->get()
+            ->groupBy('student_id')
+            ->map(function ($grouped, $studentId) {
+                $student = $grouped->first()->student;
+                $courses = $grouped->map(function ($r) { return $r->semesterCourse->course; })->unique('id')->values();
+
+                // Determine application status
+                $hasHeadApproved = $grouped->contains(function ($r) { return in_array($r->status, ['head_approved', 'completed']); });
+                $hasAdvisorApproved = $grouped->contains(function ($r) { return $r->status === 'advisor_approved'; });
+                $hasRejected = $grouped->contains(function ($r) { return $r->status === 'rejected'; });
+
+                if ($hasHeadApproved) {
+                    $status = 'approved';
+                } elseif ($hasRejected && ! $hasHeadApproved) {
+                    $status = 'rejected';
+                } elseif ($hasAdvisorApproved) {
+                    $status = 'advisor_approved';
+                } else {
+                    $status = 'pending';
+                }
+
+                return (object) [
+                    'student' => $student,
+                    'courses' => $courses,
+                    'status' => $status,
+                    'registrations' => $grouped,
+                ];
+            })->values();
+
+        // Simple pagination of the collection (convert to LengthAwarePaginator)
+        $page = request()->get('page', 1);
+        $perPage = 25;
+        $total = $studentApplications->count();
+        $items = $studentApplications->forPage($page, $perPage);
+        $paginator = new \Illuminate\Pagination\LengthAwarePaginator($items, $total, $perPage, $page, [
+            'path' => request()->url(),
+            'query' => request()->query(),
+        ]);
+
+        return view('authority.semesters.registrations', ['semester' => $semester, 'registrations' => $paginator]);
     }
     
     // Course Management
@@ -337,6 +382,56 @@ class AuthorityController extends Controller
             return back()->with('error', 'Failed to create user.')->withInput();
         }
     }
+
+    public function editUser(User $user)
+    {
+        $batches = Batch::all();
+        $advisors = User::where('role', 'advisor')->get();
+        return view('authority.users.edit', compact('user', 'batches', 'advisors'));
+    }
+
+    public function updateUser(Request $request, User $user)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email,' . $user->id,
+            'role' => 'required|in:student,advisor,department_head,authority',
+            'student_id' => 'nullable|string',
+            'phone' => 'nullable|string|max:20',
+            'batch_id' => 'nullable|exists:batches,id',
+            'advisor_id' => 'nullable|exists:users,id',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $user->update($request->only(['name', 'email', 'role']));
+
+            if ($request->role === 'student') {
+                $profileData = [
+                    'student_id' => $request->student_id,
+                    'phone' => $request->phone,
+                    'batch_id' => $request->batch_id,
+                    'advisor_id' => $request->advisor_id,
+                ];
+                if ($user->profile) {
+                    $user->profile->update($profileData);
+                } else {
+                    $user->profile()->create($profileData);
+                }
+            } else {
+                // Remove student profile if role changed away from student
+                if ($user->profile) {
+                    $user->profile()->delete();
+                }
+            }
+
+            DB::commit();
+            return redirect()->route('authority.users')->with('success', 'User updated successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to update user.')->withInput();
+        }
+    }
     
     // Fee Management
     public function fees()
@@ -351,6 +446,39 @@ class AuthorityController extends Controller
         $batches = Batch::all();
         $semesters = Semester::all();
         return view('authority.fees.create', compact('batches', 'semesters'));
+    }
+
+    public function editFee(Fee $fee)
+    {
+        $batches = Batch::all();
+        $semesters = Semester::all();
+        return view('authority.fees.edit', compact('fee', 'batches', 'semesters'));
+    }
+
+    public function updateFee(Request $request, Fee $fee)
+    {
+        $request->validate([
+            'semester_id' => 'required|exists:semesters,id',
+            'per_credit_fee' => 'required|numeric|min:0',
+            'admission_fee' => 'nullable|numeric|min:0',
+            'lab_fee' => 'nullable|numeric|min:0',
+            'library_fee' => 'nullable|numeric|min:0',
+            'other_fees' => 'nullable|numeric|min:0',
+            'fee_description' => 'nullable|string',
+        ]);
+
+        $fee->update([
+            'semester_id' => $request->semester_id,
+            'per_credit_fee' => $request->per_credit_fee,
+            'admission_fee' => $request->admission_fee ?? 0,
+            'lab_fee' => $request->lab_fee ?? 0,
+            'library_fee' => $request->library_fee ?? 0,
+            'other_fees' => $request->other_fees ?? 0,
+            'fee_description' => $request->fee_description,
+            'is_active' => $request->has('is_active') ? (bool)$request->is_active : $fee->is_active,
+        ]);
+
+        return redirect()->route('authority.fees')->with('success', 'Fee updated successfully.');
     }
     
     public function storeFee(Request $request)
