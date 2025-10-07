@@ -25,12 +25,23 @@ class StudentController extends Controller
             ->get();
         
         // Count registrations by status
+        $pending = CourseRegistration::where('student_id', $student->id)->where('status', 'pending')->count();
+        $advisorApproved = CourseRegistration::where('student_id', $student->id)->where('status', 'advisor_approved')->count();
+        $headApproved = CourseRegistration::where('student_id', $student->id)->where('status', 'head_approved')->count();
+        $completed = CourseRegistration::where('student_id', $student->id)->where('status', 'completed')->count();
+        $rejected = CourseRegistration::where('student_id', $student->id)->where('status', 'rejected')->count();
+
+        $approved = $advisorApproved + $headApproved + $completed;
+        $total = $pending + $approved + $rejected;
+
         $stats = [
-            'pending' => CourseRegistration::where('student_id', $student->id)->where('status', 'pending')->count(),
-            'advisor_approved' => CourseRegistration::where('student_id', $student->id)->where('status', 'advisor_approved')->count(),
-            'head_approved' => CourseRegistration::where('student_id', $student->id)->where('status', 'head_approved')->count(),
-            'completed' => CourseRegistration::where('student_id', $student->id)->where('status', 'completed')->count(),
-            'rejected' => CourseRegistration::where('student_id', $student->id)->where('status', 'rejected')->count(),
+            'pending' => $pending,
+            'advisor_approved' => $advisorApproved,
+            'head_approved' => $headApproved,
+            'completed' => $completed,
+            'rejected' => $rejected,
+            'approved' => $approved,
+            'total' => $total,
         ];
         
         // Get payment slips
@@ -54,7 +65,7 @@ class StudentController extends Controller
                 ->with('error', 'No active semester available for registration.');
         }
         
-        // Get available courses for the semester
+    // Get available courses for the semester
         $availableCourses = SemesterCourse::with('course')
             ->where('semester_id', $activeSemester->id)
             ->where('is_available', true)
@@ -67,7 +78,10 @@ class StudentController extends Controller
             ->pluck('semester_course_id')
             ->toArray();
         
-        return view('student.courses', compact('activeSemester', 'availableCourses', 'registeredCourseIds'));
+    // Provide $currentSemester for the view (legacy var name used in blade)
+    $currentSemester = $activeSemester;
+
+    return view('student.courses', compact('activeSemester', 'availableCourses', 'registeredCourseIds', 'currentSemester'));
     }
     
     public function registrations()

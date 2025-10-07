@@ -52,13 +52,21 @@ class CourseRegistrationController extends Controller
                     'applied_at' => now(),
                 ]);
                 
-                // Create approval record for advisor
-                RegistrationApproval::create([
-                    'course_registration_id' => $registration->id,
-                    'approver_id' => $student->profile->advisor_id,
-                    'approver_role' => 'advisor',
-                    'status' => 'pending',
-                ]);
+                // Create approval record for advisor if advisor exists on student's profile
+                if ($student->profile && $student->profile->advisor_id) {
+                    RegistrationApproval::create([
+                        'course_registration_id' => $registration->id,
+                        'approver_id' => $student->profile->advisor_id,
+                        'approver_role' => 'advisor',
+                        'status' => 'pending',
+                    ]);
+                } else {
+                    // If no advisor assigned, log a warning and continue (admins can handle approvals)
+                    \Log::warning('Student missing advisor; skipping advisor approval creation', [
+                        'student_id' => $student->id,
+                        'registration_id' => $registration->id,
+                    ]);
+                }
                 
                 $registeredCount++;
             }
@@ -70,6 +78,12 @@ class CourseRegistrationController extends Controller
                 
         } catch (\Exception $e) {
             DB::rollBack();
+            // Log exception with full trace for debugging
+            \Log::error('Course registration failed', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'student_id' => $student->id ?? null,
+            ]);
             return back()->with('error', 'Failed to register courses. Please try again.');
         }
     }

@@ -34,7 +34,12 @@
             <div class="alert alert-info alert-modern">
                 <i class="bi bi-info-circle-fill me-2"></i>
                 <strong>{{ $currentSemester->name }} {{ $currentSemester->year }}</strong> | 
-                Registration Deadline: {{ $currentSemester->registration_end->format('F d, Y') }}
+                Registration Deadline: 
+                @if($currentSemester->registration_end)
+                    {{ $currentSemester->registration_end->format('F d, Y') }}
+                @else
+                    Not set
+                @endif
             </div>
         @endif
     </div>
@@ -46,7 +51,7 @@
             <i class="bi bi-list-check me-2"></i>Select Courses to Register
         </div>
         <div class="card-body">
-            <form action="{{ route('course-registrations.store') }}" method="POST">
+            <form action="{{ route('student.register.store') }}" method="POST">
                 @csrf
                 <input type="hidden" name="semester_id" value="{{ $currentSemester->id }}">
                 
@@ -68,15 +73,15 @@
                                         <div class="form-check">
                                             <input class="form-check-input course-checkbox" 
                                                    type="checkbox" 
-                                                   name="semester_course_ids[]" 
+                                                name="semester_courses[]" 
                                                    value="{{ $semesterCourse->id }}"
                                                    id="course_{{ $semesterCourse->id }}"
-                                                   data-credits="{{ $semesterCourse->course->credits }}">
+                                                data-credits="{{ $semesterCourse->course->credit_hours }}">
                                         </div>
                                     </td>
                                     <td><strong>{{ $semesterCourse->course->course_code }}</strong></td>
                                     <td>{{ $semesterCourse->course->course_name }}</td>
-                                    <td>{{ $semesterCourse->course->credits }}</td>
+                                    <td>{{ $semesterCourse->course->credit_hours }}</td>
                                     <td>
                                         <small class="text-muted">
                                             {{ $semesterCourse->course->description ?? 'No description available' }}

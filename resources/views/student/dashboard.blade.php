@@ -35,7 +35,13 @@
                 <i class="bi bi-info-circle-fill me-2"></i>
                 <strong>Current Semester:</strong> {{ $currentSemester->name }} {{ $currentSemester->year }}
                 <br>
-                <small>Registration Period: {{ $currentSemester->registration_start->format('M d, Y') }} - {{ $currentSemester->registration_end->format('M d, Y') }}</small>
+                <small>Registration Period:
+                    @if($currentSemester->registration_start && $currentSemester->registration_end)
+                        {{ $currentSemester->registration_start->format('M d, Y') }} - {{ $currentSemester->registration_end->format('M d, Y') }}
+                    @else
+                        Dates not set
+                    @endif
+                </small>
             </div>
         @else
             <div class="alert alert-warning alert-modern">
@@ -133,7 +139,7 @@
                                             <strong>{{ $registration->semesterCourse->course->course_code }}</strong><br>
                                             <small class="text-muted">{{ $registration->semesterCourse->course->course_name }}</small>
                                         </td>
-                                        <td>{{ $registration->semesterCourse->course->credits }}</td>
+                                        <td>{{ $registration->semesterCourse->course->credit_hours }}</td>
                                         <td>{{ $registration->semester->name }}</td>
                                         <td>
                                             @if($registration->status === 'pending')
