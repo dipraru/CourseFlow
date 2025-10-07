@@ -341,7 +341,8 @@ class AuthorityController extends Controller
     // Fee Management
     public function fees()
     {
-        $fees = Fee::with(['batch', 'semester'])->paginate(15);
+    // eager-load semester courses and their course to compute credit totals in the view
+    $fees = Fee::with(['batch', 'semester.semesterCourses.course'])->paginate(15);
         return view('authority.fees.index', compact('fees'));
     }
     
@@ -355,29 +356,35 @@ class AuthorityController extends Controller
     public function storeFee(Request $request)
     {
         $request->validate([
-            'batch_id' => 'required|exists:batches,id',
+            'batch_id' => 'nullable|exists:batches,id',
             'semester_id' => 'required|exists:semesters,id',
-            'tuition_fee' => 'required|numeric|min:0',
+            'tuition_fee' => 'nullable|numeric|min:0',
+            'per_credit_fee' => 'nullable|numeric|min:0',
             'lab_fee' => 'nullable|numeric|min:0',
             'library_fee' => 'nullable|numeric|min:0',
             'other_fees' => 'nullable|numeric|min:0',
+            'admission_fee' => 'nullable|numeric|min:0',
+            'fee_description' => 'nullable|string',
         ]);
-        
-        $totalAmount = $request->tuition_fee + 
-                      ($request->lab_fee ?? 0) + 
-                      ($request->library_fee ?? 0) + 
-                      ($request->other_fees ?? 0);
-        
+
+        // prefer explicit per_credit_fee, fall back to tuition_fee input for backward compatibility
+        $perCredit = $request->input('per_credit_fee') ?? $request->input('tuition_fee');
+
+        if (is_null($perCredit)) {
+            return back()->with('error', 'Per-credit fee (or tuition_fee) is required.')->withInput();
+        }
+
         Fee::create([
-            'batch_id' => $request->batch_id,
             'semester_id' => $request->semester_id,
-            'tuition_fee' => $request->tuition_fee,
-            'lab_fee' => $request->lab_fee,
-            'library_fee' => $request->library_fee,
-            'other_fees' => $request->other_fees,
-            'total_amount' => $totalAmount,
+            'per_credit_fee' => $perCredit,
+            'admission_fee' => $request->input('admission_fee', 0),
+            'library_fee' => $request->input('library_fee', 0),
+            'lab_fee' => $request->input('lab_fee', 0),
+            'other_fees' => $request->input('other_fees', 0),
+            'fee_description' => $request->input('fee_description'),
+            'is_active' => true,
         ]);
-        
+
         return redirect()->route('authority.fees')->with('success', 'Fee structure created successfully.');
     }
     
@@ -390,6 +397,11 @@ class AuthorityController extends Controller
             ->paginate(20);
         
         return view('authority.payment-slips', compact('paymentSlips'));
+    }
+    
+    public function payments()
+    {
+        return $this->paymentSlips();
     }
     
     public function verifyPayment(Request $request, PaymentSlip $paymentSlip)

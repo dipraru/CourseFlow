@@ -82,10 +82,12 @@ Route::middleware(['auth', 'role:authority'])->prefix('authority')->name('author
     
     // User Management
     Route::get('/users', [AuthorityController::class, 'users'])->name('users');
+    Route::get('/users/create', [AuthorityController::class, 'createUser'])->name('users.create');
     Route::post('/users', [AuthorityController::class, 'storeUser'])->name('users.store');
     
     // Fee Management
     Route::get('/fees', [AuthorityController::class, 'fees'])->name('fees');
+    Route::get('/fees/create', [AuthorityController::class, 'createFee'])->name('createFee');
     Route::post('/fees', [AuthorityController::class, 'storeFee'])->name('fees.store');
     
     // Payment Verification
