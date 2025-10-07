@@ -101,7 +101,7 @@
                                     <tr>
                                         <td>{{ $batchName }}</td>
                                         <td>{{ $users->count() }}</td>
-                                        <td>{{ $users->sum(function($u){ return $u->courseRegistrations->count(); }) }}</td>
+                                        <td>{{ $users->sum(function($u){ return $u->courseRegistrations->pluck('semester_id')->unique()->count(); }) }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>

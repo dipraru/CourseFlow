@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\Semester;
 use App\Models\Course;
 use App\Models\SemesterCourse;
+use App\Models\CourseRegistration;
 use App\Models\Fee;
 use App\Models\PaymentSlip;
 use App\Models\Batch;
@@ -40,8 +41,11 @@ class AuthorityController extends Controller
     // Semester Management
     public function semesters()
     {
-        // Include counts for semester courses and any student registrations so we can show & guard deletion
-        $semesters = Semester::withCount(['semesterCourses', 'courseRegistrations'])->latest()->paginate(15);
+        // Include counts for semester courses and distinct student registrations (one student = one registration)
+        $semesters = Semester::select('semesters.*', DB::raw('(select count(distinct student_id) from course_registrations where course_registrations.semester_id = semesters.id) as student_registrations_count'))
+            ->withCount(['semesterCourses'])
+            ->latest()
+            ->paginate(15);
         return view('authority.semesters.index', compact('semesters'));
     }
     
@@ -234,8 +238,49 @@ class AuthorityController extends Controller
 
     public function semesterRegistrations(Semester $semester)
     {
-        $registrations = $semester->courseRegistrations()->with(['semesterCourse.course', 'student.profile'])->latest()->paginate(25);
-        return view('authority.semesters.registrations', compact('semester', 'registrations'));
+        // Group registrations by student (one application per student per semester)
+        $studentApplications = CourseRegistration::where('semester_id', $semester->id)
+            ->with(['semesterCourse.course', 'student.profile'])
+            ->get()
+            ->groupBy('student_id')
+            ->map(function ($grouped, $studentId) {
+                $student = $grouped->first()->student;
+                $courses = $grouped->map(function ($r) { return $r->semesterCourse->course; })->unique('id')->values();
+
+                // Determine application status
+                $hasHeadApproved = $grouped->contains(function ($r) { return in_array($r->status, ['head_approved', 'completed']); });
+                $hasAdvisorApproved = $grouped->contains(function ($r) { return $r->status === 'advisor_approved'; });
+                $hasRejected = $grouped->contains(function ($r) { return $r->status === 'rejected'; });
+
+                if ($hasHeadApproved) {
+                    $status = 'approved';
+                } elseif ($hasRejected && ! $hasHeadApproved) {
+                    $status = 'rejected';
+                } elseif ($hasAdvisorApproved) {
+                    $status = 'advisor_approved';
+                } else {
+                    $status = 'pending';
+                }
+
+                return (object) [
+                    'student' => $student,
+                    'courses' => $courses,
+                    'status' => $status,
+                    'registrations' => $grouped,
+                ];
+            })->values();
+
+        // Simple pagination of the collection (convert to LengthAwarePaginator)
+        $page = request()->get('page', 1);
+        $perPage = 25;
+        $total = $studentApplications->count();
+        $items = $studentApplications->forPage($page, $perPage);
+        $paginator = new \Illuminate\Pagination\LengthAwarePaginator($items, $total, $perPage, $page, [
+            'path' => request()->url(),
+            'query' => request()->query(),
+        ]);
+
+        return view('authority.semesters.registrations', ['semester' => $semester, 'registrations' => $paginator]);
     }
     
     // Course Management

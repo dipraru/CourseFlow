@@ -32,22 +32,34 @@ class StudentController extends Controller
             $currentSemester->registration_end = $currentSemester->registration_end_date;
         }
         
-        // Get student's registrations for current semester
+        // Get student's registrations for current semester (per-course)
         $registrations = CourseRegistration::with(['semesterCourse.course', 'semester'])
             ->where('student_id', $student->id)
             ->where('semester_id', $currentSemester?->id)
             ->latest()
             ->get();
-        
-        // Count registrations by status
-        $pending = CourseRegistration::where('student_id', $student->id)->where('status', 'pending')->count();
-        $advisorApproved = CourseRegistration::where('student_id', $student->id)->where('status', 'advisor_approved')->count();
-        $headApproved = CourseRegistration::where('student_id', $student->id)->where('status', 'head_approved')->count();
-        $completed = CourseRegistration::where('student_id', $student->id)->where('status', 'completed')->count();
-        $rejected = CourseRegistration::where('student_id', $student->id)->where('status', 'rejected')->count();
 
-        $approved = $advisorApproved + $headApproved + $completed;
-        $total = $pending + $approved + $rejected;
+        // Compute application-level status for current semester (treat all course registrations for a student+semester as one application)
+        $hasAny = $registrations->isNotEmpty();
+        $hasHeadApproved = $registrations->contains(function ($r) {
+            return in_array($r->status, ['head_approved', 'completed']);
+        });
+        $hasAdvisorApproved = $registrations->contains(function ($r) {
+            return $r->status === 'advisor_approved';
+        });
+        $hasRejected = $registrations->contains(function ($r) {
+            return $r->status === 'rejected';
+        });
+
+        // Derive counts: one application per student per semester
+        $pending = ($hasAny && ! $hasHeadApproved && ! $hasRejected) ? 1 : 0; // advisor approvals are still pending overall
+        $advisorApproved = ($hasAny && $hasAdvisorApproved && ! $hasHeadApproved) ? 1 : 0; // intermediate state
+        $headApproved = $hasHeadApproved ? 1 : 0;
+        $completed = $registrations->contains(function ($r) { return $r->status === 'completed'; }) ? 1 : 0;
+        $rejected = ($hasAny && $hasRejected && ! $hasHeadApproved) ? 1 : 0;
+
+        $approved = $headApproved + $completed; // final approvals only
+        $total = $hasAny ? 1 : 0;
 
         $stats = [
             'pending' => $pending,

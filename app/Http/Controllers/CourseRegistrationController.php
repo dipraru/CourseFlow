@@ -36,7 +36,31 @@ class CourseRegistrationController extends Controller
         DB::beginTransaction();
         try {
             $registeredCount = 0;
-            
+            // If student already has a final-approved application for this semester, block further registrations
+            $finalExists = CourseRegistration::where('student_id', $student->id)
+                ->where('semester_id', $activeSemester->id)
+                ->whereIn('status', ['head_approved', 'completed'])
+                ->exists();
+
+            if ($finalExists) {
+                DB::rollBack();
+                return back()->with('error', 'Your registration for this semester has been finally approved. You cannot submit new registrations for this semester.');
+            }
+
+            // If there are existing non-final registrations for this student+semester, remove them (and their approvals) before creating a new application
+            $existingRegs = CourseRegistration::where('student_id', $student->id)
+                ->where('semester_id', $activeSemester->id)
+                ->whereIn('status', ['pending', 'advisor_approved', 'rejected'])
+                ->get();
+
+            if ($existingRegs->isNotEmpty()) {
+                $existingIds = $existingRegs->pluck('id')->toArray();
+                // delete related approvals
+                \App\Models\RegistrationApproval::whereIn('course_registration_id', $existingIds)->delete();
+                // delete registrations
+                CourseRegistration::whereIn('id', $existingIds)->delete();
+            }
+
             foreach ($request->semester_courses as $semesterCourseId) {
                 // Get semester course details
                 $semesterCourse = SemesterCourse::with('course')->findOrFail($semesterCourseId);
