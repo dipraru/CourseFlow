@@ -36,4 +36,9 @@ class Fee extends Model
     {
         return $this->belongsTo(Semester::class);
     }
+
+    public function batch()
+    {
+        return $this->belongsTo(Batch::class);
+    }
 }

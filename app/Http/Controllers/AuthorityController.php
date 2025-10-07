@@ -268,6 +268,11 @@ class AuthorityController extends Controller
         return view('authority.payment-slips', compact('paymentSlips'));
     }
     
+    public function payments()
+    {
+        return $this->paymentSlips();
+    }
+    
     public function verifyPayment(Request $request, PaymentSlip $paymentSlip)
     {
         $request->validate([
