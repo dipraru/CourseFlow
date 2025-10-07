@@ -10,6 +10,7 @@ use App\Models\Semester;
 use App\Models\Fee;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class DepartmentHeadController extends Controller
 {
@@ -23,8 +24,8 @@ class DepartmentHeadController extends Controller
         // Stats
         $stats = [
             'pending_approvals' => $pendingCount,
-            'approved_today' => CourseRegistration::where('status', 'approved')
-                ->whereDate('dept_head_approved_at', today())
+            'approved_today' => CourseRegistration::where('status', 'head_approved')
+                ->whereDate('head_approved_at', today())
                 ->count(),
             'total_registrations' => CourseRegistration::whereHas('semester', function($q) {
                 $q->where('is_current', true);
@@ -36,8 +37,8 @@ class DepartmentHeadController extends Controller
         
         // Recent approvals
         $recentApprovals = CourseRegistration::with(['student.profile', 'semesterCourse.course', 'semester'])
-            ->where('status', 'approved')
-            ->latest('dept_head_approved_at')
+            ->where('status', 'head_approved')
+            ->latest('head_approved_at')
             ->take(10)
             ->get();
         
@@ -67,9 +68,11 @@ class DepartmentHeadController extends Controller
         DB::beginTransaction();
         try {
             // Update registration status
+            $now = now();
             $registration->update([
-                'status' => 'approved',
-                'dept_head_approved_at' => now(),
+                'status' => 'head_approved',
+                'head_approved_at' => $now,
+                'dept_head_approved_at' => $now, // keep both timestamps in sync for compatibility
             ]);
             
             // Update department head approval record
@@ -78,7 +81,7 @@ class DepartmentHeadController extends Controller
                 ->update([
                     'status' => 'approved',
                     'comments' => $request->comments,
-                    'action_taken_at' => now(),
+                    'action_taken_at' => $now,
                 ]);
             
             // Generate payment slip for the student and semester
@@ -92,26 +95,66 @@ class DepartmentHeadController extends Controller
             
             if (!$existingSlip) {
                 // Get fee structure
-                $fee = Fee::where('batch_id', $student->profile->batch_id)
-                    ->where('semester_id', $semester->id)
-                    ->first();
+                // Some installations may not yet have the fees.batch_id column (migration pending).
+                // Check the schema and fall back to a semester-only fee when batch_id is not available.
+                if (Schema::hasColumn('fees', 'batch_id') && !empty($student->profile->batch_id)) {
+                    $fee = Fee::where('batch_id', $student->profile->batch_id)
+                        ->where('semester_id', $semester->id)
+                        ->first();
+                } else {
+                    $fee = Fee::where('semester_id', $semester->id)->first();
+                }
                 
                 if ($fee) {
-                    // Generate slip number (format: SEMESTER_YEAR-BATCH-STUDENT_ID)
-                    $slipNumber = strtoupper($semester->name) . '-' . 
-                                 $student->profile->batch->name . '-' . 
-                                 str_pad($student->id, 4, '0', STR_PAD_LEFT);
+                    // Compute credit hours and total amount for the payment slip
+                    $course = $registration->semesterCourse->course ?? null;
+                    $creditHours = $course->credit_hours ?? 0;
                     
-                    PaymentSlip::create([
-                        'student_id' => $student->id,
-                        'semester_id' => $semester->id,
-                        'slip_number' => $slipNumber,
-                        'total_amount' => $fee->total_amount,
-                        'payment_status' => 'unpaid',
-                        'generated_at' => now(),
-                    ]);
-                }
-            }
+                    // Calculate total using fee components (fallback zeros to avoid null arithmetic)
+                    $totalAmount = (float)($fee->per_credit_fee ?? 0) * (float)$creditHours
+                        + (float)($fee->admission_fee ?? 0)
+                        + (float)($fee->library_fee ?? 0)
+                        + (float)($fee->lab_fee ?? 0)
+                        + (float)($fee->other_fees ?? 0);
+                    
+                    $feeBreakdown = [
+                        'per_credit_fee' => (float)($fee->per_credit_fee ?? 0),
+                        'credit_hours' => (float)$creditHours,
+                        'admission_fee' => (float)($fee->admission_fee ?? 0),
+                        'library_fee' => (float)($fee->library_fee ?? 0),
+                        'lab_fee' => (float)($fee->lab_fee ?? 0),
+                        'other_fees' => (float)($fee->other_fees ?? 0),
+                        'calculated_total' => (float)$totalAmount,
+                    ];
+                    
+                    $registeredCourses = [];
+                    if ($course) {
+                        $registeredCourses[] = [
+                            'id' => $course->id,
+                            'code' => $course->course_code ?? null,
+                            'name' => $course->course_name ?? null,
+                            'credit_hours' => (float)($course->credit_hours ?? 0),
+                        ];
+                    }
+                    
+                     // Generate slip number (format: SEMESTER_YEAR-BATCH-STUDENT_ID)
+                     $slipNumber = strtoupper($semester->name) . '-' . 
+                                  $student->profile->batch->name . '-' . 
+                                  str_pad($student->id, 4, '0', STR_PAD_LEFT);
+                     
+                     PaymentSlip::create([
+                         'student_id' => $student->id,
+                         'semester_id' => $semester->id,
+                         'slip_number' => $slipNumber,
+                         'total_amount' => $totalAmount,
+                         'credit_hours' => $creditHours,
+                         'fee_breakdown' => $feeBreakdown,
+                         'registered_courses' => $registeredCourses,
+                         'payment_status' => 'unpaid',
+                         'generated_at' => now(),
+                     ]);
+                 }
+             }
             
             DB::commit();
             

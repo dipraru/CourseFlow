@@ -42,6 +42,7 @@ Route::middleware(['auth', 'role:student'])->prefix('student')->name('student.')
     Route::post('/register-courses', [CourseRegistrationController::class, 'store'])->name('register.store');
     Route::get('/payment-slip/{paymentSlip}', [PaymentSlipController::class, 'show'])->name('payment-slip.show');
     Route::get('/payment-slip/{paymentSlip}/download', [PaymentSlipController::class, 'download'])->name('payment-slip.download');
+    Route::patch('/payment-slip/{paymentSlip}/submit', [PaymentSlipController::class, 'submit'])->name('payment-slip.submit');
 });
 
 // Advisor Routes

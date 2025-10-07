@@ -193,7 +193,7 @@
                     </div>
                     <div class="info-row">
                         <div class="info-label">Issue Date:</div>
-                        <div class="info-value">{{ $paymentSlip->generated_at->format('d M, Y') }}</div>
+                        <div class="info-value">{{ optional($paymentSlip->generated_at)->format('d M, Y') ?? '-' }}</div>
                     </div>
                 </div>
                 
@@ -225,7 +225,7 @@
                     <ul>
                         <li>Pay at any authorized bank branch</li>
                         <li>Keep this copy for your records</li>
-                        <li>Payment deadline: {{ $paymentSlip->semester->registration_end->format('d M, Y') }}</li>
+                        <li>Payment deadline: {{ optional($paymentSlip->semester->registration_end)->format('d M, Y') ?? 'Not set' }}</li>
                     </ul>
                 </div>
                 
@@ -268,7 +268,7 @@
                     </div>
                     <div class="info-row">
                         <div class="info-label">Issue Date:</div>
-                        <div class="info-value">{{ $paymentSlip->generated_at->format('d M, Y') }}</div>
+                        <div class="info-value">{{ optional($paymentSlip->generated_at)->format('d M, Y') ?? '-' }}</div>
                     </div>
                 </div>
                 
@@ -349,7 +349,7 @@
                     </div>
                     <div class="info-row">
                         <div class="info-label">Issue Date:</div>
-                        <div class="info-value">{{ $paymentSlip->generated_at->format('d M, Y') }}</div>
+                        <div class="info-value">{{ optional($paymentSlip->generated_at)->format('d M, Y') ?? '-' }}</div>
                     </div>
                 </div>
                 
