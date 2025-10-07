@@ -26,7 +26,19 @@
                             <tr>
                                 <td>{{ $fee->batch->name ?? 'N/A' }}</td>
                                 <td>{{ $fee->semester->name ?? 'N/A' }}</td>
-                                <td>৳{{ number_format($fee->total_amount, 2) }}</td>
+                                @php
+                                    // compute total: per_credit_fee * sum(course credit_hours) + other static fees
+                                    $computedTotal = null;
+                                    $perCredit = $fee->per_credit_fee ?? 0;
+                                    if ($fee->semester && $fee->semester->semesterCourses) {
+                                        $totalCredits = $fee->semester->semesterCourses->sum(function($sc) {
+                                            return $sc->course?->credit_hours ?? 0;
+                                        });
+                                        $computedTotal = ($perCredit * $totalCredits) + ($fee->admission_fee ?? 0) + ($fee->library_fee ?? 0) + ($fee->lab_fee ?? 0) + ($fee->other_fees ?? 0);
+                                    }
+                                    $display = $computedTotal ?? ($fee->total_amount ?? 0);
+                                @endphp
+                                <td>৳{{ number_format($display, 2) }}</td>
                                 <td>
                                     <a href="#" class="btn btn-sm btn-outline-secondary">Edit</a>
                                 </td>
