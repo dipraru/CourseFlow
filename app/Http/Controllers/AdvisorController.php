@@ -126,7 +126,7 @@ class AdvisorController extends Controller
             
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Failed to approve registration.');
+            return back()->with('error', 'Failed to approve registration: ' . $e->getMessage());
         }
     }
     

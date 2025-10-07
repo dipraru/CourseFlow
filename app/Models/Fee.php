@@ -11,6 +11,7 @@ class Fee extends Model
 
     protected $fillable = [
         'semester_id',
+        'batch_id',
         'per_credit_fee',
         'admission_fee',
         'library_fee',

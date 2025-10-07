@@ -194,14 +194,14 @@
                                     Amount: <strong>৳{{ number_format($slip->total_amount, 2) }}</strong>
                                 </div>
                                 <div class="btn-group btn-group-sm">
-                                    <a href="{{ route('payment-slip.show', $slip) }}" class="btn btn-outline-primary">
+                                    <a href="{{ route('student.payment-slip.show', $slip) }}" class="btn btn-outline-primary">
                                         <i class="bi bi-eye"></i> View
                                     </a>
-                                    <a href="{{ route('payment-slip.download', $slip) }}" class="btn btn-outline-secondary">
+                                    <a href="{{ route('student.payment-slip.download', $slip) }}" class="btn btn-outline-secondary">
                                         <i class="bi bi-download"></i> Download
                                     </a>
                                     @if($slip->payment_status === 'unpaid')
-                                        <form action="{{ route('payment-slip.submit', $slip) }}" method="POST" class="d-inline">
+                                        <form action="{{ route('student.payment-slip.submit', $slip) }}" method="POST" class="d-inline">
                                             @csrf
                                             @method('PATCH')
                                             <button type="submit" class="btn btn-outline-success" onclick="return confirm('Have you paid the fees at the bank?')">
