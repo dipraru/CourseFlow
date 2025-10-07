@@ -9,6 +9,8 @@ use App\Models\RegistrationApproval;
 use App\Models\Fee;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 class CourseRegistrationController extends Controller
 {
@@ -20,17 +22,40 @@ class CourseRegistrationController extends Controller
             'remarks' => 'nullable|string|max:500',
         ]);
         
-        $student = auth()->user();
-        $activeSemester = Semester::where('is_active', true)->firstOrFail();
+    $student = Auth::user();
+        // Determine active semester by registration window first, then fallback to is_active
+        $today = now()->toDateString();
+        $activeSemester = Semester::whereDate('registration_start_date', '<=', $today)
+            ->whereDate('registration_end_date', '>=', $today)
+            ->first();
+
+        if (! $activeSemester) {
+            $activeSemester = Semester::where('is_active', true)->firstOrFail();
+        }
         
         DB::beginTransaction();
         try {
             $registeredCount = 0;
             
             foreach ($request->semester_courses as $semesterCourseId) {
+                // Get semester course details
+                $semesterCourse = SemesterCourse::with('course')->findOrFail($semesterCourseId);
+
+                // Ensure the semester_course belongs to the active semester
+                if ($semesterCourse->semester_id !== $activeSemester->id) {
+                    // Skip and log if the selected semester_course is not for the active semester
+                    Log::warning('Attempt to register for semester_course not in active semester', [
+                        'student_id' => $student->id,
+                        'semester_course_id' => $semesterCourseId,
+                        'active_semester_id' => $activeSemester->id,
+                        'semester_course_semester_id' => $semesterCourse->semester_id,
+                    ]);
+                    continue;
+                }
+
                 // Check if already registered
                 $exists = CourseRegistration::where('student_id', $student->id)
-                    ->where('semester_id', $activeSemester->id)
+                    ->where('semester_id', $semesterCourse->semester_id)
                     ->where('semester_course_id', $semesterCourseId)
                     ->whereIn('status', ['pending', 'advisor_approved', 'head_approved', 'completed'])
                     ->exists();
@@ -39,13 +64,10 @@ class CourseRegistrationController extends Controller
                     continue;
                 }
                 
-                // Get semester course details
-                $semesterCourse = SemesterCourse::with('course')->findOrFail($semesterCourseId);
-                
-                // Create registration
+                // Create registration using semester_id from the semesterCourse
                 $registration = CourseRegistration::create([
                     'student_id' => $student->id,
-                    'semester_id' => $activeSemester->id,
+                    'semester_id' => $semesterCourse->semester_id,
                     'semester_course_id' => $semesterCourseId,
                     'status' => 'pending',
                     'student_remarks' => $request->remarks,
@@ -62,7 +84,7 @@ class CourseRegistrationController extends Controller
                     ]);
                 } else {
                     // If no advisor assigned, log a warning and continue (admins can handle approvals)
-                    \Log::warning('Student missing advisor; skipping advisor approval creation', [
+                    Log::warning('Student missing advisor; skipping advisor approval creation', [
                         'student_id' => $student->id,
                         'registration_id' => $registration->id,
                     ]);
@@ -79,7 +101,7 @@ class CourseRegistrationController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             // Log exception with full trace for debugging
-            \Log::error('Course registration failed', [
+            Log::error('Course registration failed', [
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'student_id' => $student->id ?? null,
