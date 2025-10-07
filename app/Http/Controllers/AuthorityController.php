@@ -40,35 +40,78 @@ class AuthorityController extends Controller
     // Semester Management
     public function semesters()
     {
-        $semesters = Semester::withCount('semesterCourses')->latest()->paginate(15);
+        // Include counts for semester courses and any student registrations so we can show & guard deletion
+        $semesters = Semester::withCount(['semesterCourses', 'courseRegistrations'])->latest()->paginate(15);
         return view('authority.semesters.index', compact('semesters'));
     }
     
     public function createSemester()
     {
-        return view('authority.semesters.create');
+        $courses = Course::orderBy('course_code')->get();
+        return view('authority.semesters.create', compact('courses'));
     }
     
     public function storeSemester(Request $request)
     {
         $request->validate([
             'name' => 'required|string|max:50|unique:semesters',
+            'type' => 'required|in:Spring,Summer,Fall',
             'year' => 'required|integer|min:2020|max:2050',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after:start_date',
-            'registration_start' => 'required|date',
-            'registration_end' => 'required|date|after:registration_start|before:end_date',
+            'semester_number' => 'required|integer|min:1',
+            'registration_start_date' => 'required|date',
+            'registration_end_date' => 'required|date|after:registration_start_date',
+            'semester_start_date' => 'required|date',
+            'semester_end_date' => 'required|date|after:semester_start_date',
             'is_current' => 'boolean',
+            'courses' => 'nullable|array',
+            'courses.*' => 'exists:courses,id',
         ]);
         
         DB::beginTransaction();
         try {
             // If this semester is marked as current, unset others
-            if ($request->is_current) {
+            if ($request->boolean('is_current')) {
                 Semester::where('is_current', true)->update(['is_current' => false]);
             }
-            
-            Semester::create($request->all());
+
+            // Map request inputs to model columns
+            $data = $request->only([
+                'name', 'type', 'year', 'semester_number',
+                'registration_start_date', 'registration_end_date',
+                'semester_start_date', 'semester_end_date', 'is_current'
+            ]);
+
+            // If marked current, also mark as active for registration availability
+            if (!empty($data['is_current'])) {
+                $data['is_active'] = true;
+            }
+
+            // Auto-enable is_active if today's date falls within registration window
+            try {
+                $today = now()->toDateString();
+                if (!empty($data['registration_start_date']) && !empty($data['registration_end_date'])) {
+                    if ($data['registration_start_date'] <= $today && $today <= $data['registration_end_date']) {
+                        $data['is_active'] = true;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // ignore date parse errors
+            }
+
+            $createdSemester = Semester::create($data);
+
+            // If courses were selected, attach them as SemesterCourse entries
+            if ($request->filled('courses')) {
+                foreach ($request->input('courses') as $courseId) {
+                    SemesterCourse::create([
+                        'semester_id' => $createdSemester->id,
+                        'course_id' => $courseId,
+                        'max_students' => 60,
+                        'enrolled_students' => 0,
+                        'is_available' => true,
+                    ]);
+                }
+            }
             
             DB::commit();
             return redirect()->route('authority.semesters')->with('success', 'Semester created successfully.');
@@ -81,29 +124,71 @@ class AuthorityController extends Controller
     
     public function editSemester(Semester $semester)
     {
-        return view('authority.semesters.edit', compact('semester'));
+        $courses = Course::orderBy('course_code')->get();
+        $selected = $semester->semesterCourses()->pluck('course_id')->toArray();
+        return view('authority.semesters.edit', compact('semester', 'courses', 'selected'));
     }
     
     public function updateSemester(Request $request, Semester $semester)
     {
         $request->validate([
             'name' => 'required|string|max:50|unique:semesters,name,' . $semester->id,
+            'type' => 'required|in:Spring,Summer,Fall',
             'year' => 'required|integer|min:2020|max:2050',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after:start_date',
-            'registration_start' => 'required|date',
-            'registration_end' => 'required|date|after:registration_start|before:end_date',
+            'semester_number' => 'required|integer|min:1',
+            'registration_start_date' => 'required|date',
+            'registration_end_date' => 'required|date|after:registration_start_date',
+            'semester_start_date' => 'required|date',
+            'semester_end_date' => 'required|date|after:semester_start_date',
             'is_current' => 'boolean',
         ]);
         
         DB::beginTransaction();
         try {
             // If this semester is marked as current, unset others
-            if ($request->is_current && !$semester->is_current) {
+            if ($request->boolean('is_current') && !$semester->is_current) {
                 Semester::where('is_current', true)->update(['is_current' => false]);
             }
-            
-            $semester->update($request->all());
+
+            $data = $request->only([
+                'name', 'type', 'year', 'semester_number',
+                'registration_start_date', 'registration_end_date',
+                'semester_start_date', 'semester_end_date', 'is_current'
+            ]);
+
+            // If semester is being marked current, also mark active
+            if (!empty($data['is_current'])) {
+                $data['is_active'] = true;
+            }
+
+            // Auto-enable is_active if today's date falls within registration window
+            try {
+                $today = now()->toDateString();
+                if (!empty($data['registration_start_date']) && !empty($data['registration_end_date'])) {
+                    if ($data['registration_start_date'] <= $today && $today <= $data['registration_end_date']) {
+                        $data['is_active'] = true;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // ignore date parse errors
+            }
+
+            $semester->update($data);
+
+            // If courses were sent during update, sync semester courses (simple approach: remove existing and add new)
+            if ($request->has('courses')) {
+                // delete existing semester courses
+                $semester->semesterCourses()->delete();
+                foreach ($request->input('courses', []) as $courseId) {
+                    SemesterCourse::create([
+                        'semester_id' => $semester->id,
+                        'course_id' => $courseId,
+                        'max_students' => 60,
+                        'enrolled_students' => 0,
+                        'is_available' => true,
+                    ]);
+                }
+            }
             
             DB::commit();
             return redirect()->route('authority.semesters')->with('success', 'Semester updated successfully.');
@@ -112,6 +197,45 @@ class AuthorityController extends Controller
             DB::rollBack();
             return back()->with('error', 'Failed to update semester.')->withInput();
         }
+    }
+
+    public function activateSemester(Semester $semester)
+    {
+        DB::beginTransaction();
+        try {
+            // Set this semester as current and active (allow multiple current semesters)
+            $semester->update(['is_current' => true, 'is_active' => true]);
+            DB::commit();
+            return back()->with('success', 'Semester marked as current successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to mark semester as current.');
+        }
+    }
+
+    public function destroySemester(Semester $semester)
+    {
+        // Prevent deleting a semester if there are course registrations tied to it
+        $registrationCount = $semester->courseRegistrations()->count();
+        if ($registrationCount > 0) {
+            return back()->with('error', 'Cannot delete this semester: there are ' . $registrationCount . ' course registrations associated with it.');
+        }
+
+        DB::beginTransaction();
+        try {
+            $semester->delete();
+            DB::commit();
+            return back()->with('success', 'Semester deleted successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to delete semester.');
+        }
+    }
+
+    public function semesterRegistrations(Semester $semester)
+    {
+        $registrations = $semester->courseRegistrations()->with(['semesterCourse.course', 'student.profile'])->latest()->paginate(25);
+        return view('authority.semesters.registrations', compact('semester', 'registrations'));
     }
     
     // Course Management

@@ -68,7 +68,11 @@ Route::middleware(['auth', 'role:authority'])->prefix('authority')->name('author
     
     // Semester Management
     Route::get('/semesters', [AuthorityController::class, 'semesters'])->name('semesters');
+    Route::get('/semesters/create', [AuthorityController::class, 'createSemester'])->name('semesters.create');
     Route::post('/semesters', [AuthorityController::class, 'storeSemester'])->name('semesters.store');
+    // No edit route per request (authority edits not required)
+    Route::delete('/semesters/{semester}', [AuthorityController::class, 'destroySemester'])->name('semesters.destroy');
+    Route::get('/semesters/{semester}/registrations', [AuthorityController::class, 'semesterRegistrations'])->name('semesters.registrations');
     Route::patch('/semesters/{semester}/activate', [AuthorityController::class, 'activateSemester'])->name('semesters.activate');
     
     // Course Management
