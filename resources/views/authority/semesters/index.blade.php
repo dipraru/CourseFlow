@@ -30,8 +30,7 @@
 <div class="row mb-4">
     <div class="col-12 d-flex justify-content-between align-items-center">
         <h3 class="mb-0">Semesters</h3>
-        <!-- Creation endpoint uses POST /authority/semesters; no separate create page is defined in routes -->
-        <a href="#" class="btn btn-primary disabled">Create Semester</a>
+    <a href="{{ route('authority.semesters.create') }}" class="btn btn-primary">Create Semester</a>
     </div>
 </div>
 
@@ -55,27 +54,43 @@
                             <tbody>
                                 @foreach($semesters as $semester)
                                     <tr>
-                                        <td>{{ $semester->name }}</td>
-                                        <td>{{ ucfirst($semester->type ?? 'n/a') }}</td>
-                                        <td>{{ $semester->year }}</td>
-                                        <td>{{ $semester->semester_courses_count ?? 0 }}</td>
-                                        <td>
+                                            <td>{{ $semester->name }}</td>
+                                            <td>{{ ucfirst($semester->type ?? 'n/a') }}</td>
+                                            <td>{{ $semester->year }}</td>
+                                            <td>{{ $semester->semester_courses_count ?? 0 }}</td>
+                                            <td>
                                             @if($semester->is_current)
                                                 <span class="badge bg-success">Active</span>
                                             @else
                                                 <span class="badge bg-secondary">Inactive</span>
                                             @endif
                                         </td>
-                                        <td class="text-end">
+                                            <td>
+                                                <a href="{{ route('authority.semesters.registrations', $semester) }}" class="btn btn-sm btn-outline-primary">
+                                                    Registrations ({{ $semester->course_registrations_count ?? 0 }})
+                                                </a>
+                                            </td>
+                                            <td class="text-end">
                                             @if(!$semester->is_current)
                                                 <form action="{{ route('authority.semesters.activate', $semester) }}" method="POST" class="d-inline">
                                                     @csrf
                                                     @method('PATCH')
-                                                    <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('Activate this semester?')">Activate</button>
+                                                    <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('Mark this semester as current?')">Mark Current</button>
                                                 </form>
                                             @else
-                                                <button class="btn btn-sm btn-outline-secondary" disabled>Activated</button>
+                                                <span class="badge bg-success">Current</span>
                                             @endif
+
+                                            @php $regCount = $semester->course_registrations_count ?? 0; @endphp
+                                            <form action="{{ route('authority.semesters.destroy', $semester) }}" method="POST" class="d-inline ms-2">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-sm {{ $regCount > 0 ? 'btn-outline-secondary' : 'btn-outline-danger' }}" {{ $regCount > 0 ? 'disabled' : '' }}
+                                                    title="{{ $regCount > 0 ? 'Cannot delete: ' . $regCount . ' registrations exist' : 'Delete semester' }}"
+                                                    onclick="return {{ $regCount > 0 ? 'false' : 'confirm(\'Delete this semester? This will also remove course offerings for this semester.\')' }}">
+                                                    {{ $regCount > 0 ? 'Has Registrations' : 'Delete' }}
+                                                </button>
+                                            </form>
                                         </td>
                                     </tr>
                                 @endforeach
