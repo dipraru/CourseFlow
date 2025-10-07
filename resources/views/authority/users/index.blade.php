@@ -28,7 +28,7 @@
                                 <td>{{ $user->email }}</td>
                                 <td>{{ ucfirst($user->role) }}</td>
                                 <td>
-                                    <a href="#" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                    <a href="{{ route('authority.users.edit', $user) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
                                 </td>
                             </tr>
                         @endforeach

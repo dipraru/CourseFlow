@@ -40,7 +40,7 @@
                                 @endphp
                                 <td>৳{{ number_format($display, 2) }}</td>
                                 <td>
-                                    <a href="#" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                    <a href="{{ route('authority.fees.edit', $fee) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
                                 </td>
                             </tr>
                         @endforeach
