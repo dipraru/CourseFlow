@@ -52,7 +52,7 @@
                                 <td><strong>{{ $student->name }}</strong></td>
                                 <td>{{ optional($student->profile->batch)->name ?? '-' }}</td>
                                 <td>{{ $student->email }}</td>
-                                <td>{{ $student->courseRegistrations->count() }}</td>
+                                <td>{{ $student->courseRegistrations->pluck('semester_id')->unique()->count() }}</td>
                             </tr>
                         @endforeach
                     </tbody>
