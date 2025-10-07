@@ -21,8 +21,13 @@ return new class extends Migration
             $table->json('fee_breakdown'); // Detailed breakdown of fees
             $table->json('registered_courses'); // List of course IDs and names
             $table->enum('status', ['generated', 'downloaded'])->default('generated');
+            $table->enum('payment_status', ['unpaid', 'paid', 'verified'])->default('unpaid');
             $table->timestamp('generated_at')->useCurrent();
             $table->timestamp('downloaded_at')->nullable();
+            $table->timestamp('paid_at')->nullable();
+            $table->timestamp('verified_at')->nullable();
+            $table->foreignId('verified_by')->nullable()->constrained('users')->onDelete('set null');
+            $table->text('payment_remarks')->nullable();
             $table->date('due_date')->nullable();
             $table->timestamps();
         });

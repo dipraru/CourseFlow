@@ -18,8 +18,13 @@ class PaymentSlip extends Model
         'fee_breakdown',
         'registered_courses',
         'status',
+        'payment_status',
         'generated_at',
         'downloaded_at',
+        'paid_at',
+        'verified_at',
+        'verified_by',
+        'payment_remarks',
         'due_date',
     ];
 
@@ -30,6 +35,8 @@ class PaymentSlip extends Model
         'registered_courses' => 'array',
         'generated_at' => 'datetime',
         'downloaded_at' => 'datetime',
+        'paid_at' => 'datetime',
+        'verified_at' => 'datetime',
         'due_date' => 'date',
     ];
 
@@ -44,5 +51,10 @@ class PaymentSlip extends Model
     public function semester()
     {
         return $this->belongsTo(Semester::class);
+    }
+
+    public function verifiedBy()
+    {
+        return $this->belongsTo(User::class, 'verified_by');
     }
 }
