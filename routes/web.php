@@ -98,6 +98,9 @@ Route::middleware(['auth', 'role:authority'])->prefix('authority')->name('author
     // Payment Verification
     Route::get('/payments', [AuthorityController::class, 'payments'])->name('payments');
     Route::post('/payments/{paymentSlip}/verify', [AuthorityController::class, 'verifyPayment'])->name('payments.verify');
+    // Approve or reject pending payment slips from dashboard
+    Route::post('/payments/{paymentSlip}/approve', [AuthorityController::class, 'approvePayment'])->name('payments.approve');
+    Route::post('/payments/{paymentSlip}/reject', [AuthorityController::class, 'rejectPayment'])->name('payments.reject');
 });
 
 require __DIR__.'/auth.php';

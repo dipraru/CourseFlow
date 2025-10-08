@@ -18,6 +18,9 @@
                             <th>Semester</th>
                             <th>Amount</th>
                             <th>Submitted At</th>
+                            <th>Verified By</th>
+                            <th>Verified At</th>
+                            <th>Remarks</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -26,13 +29,20 @@
                             <tr>
                                 <td>{{ $slip->student->name ?? 'N/A' }}</td>
                                 <td>{{ $slip->semester->name ?? 'N/A' }}</td>
-                                <td>৳{{ number_format($slip->amount, 2) }}</td>
-                                <td>{{ $slip->submitted_at?->format('Y-m-d H:i') ?? 'N/A' }}</td>
+                                <td>৳{{ number_format($slip->total_amount ?? $slip->amount ?? 0, 2) }}</td>
+                                <td>{{ $slip->paid_at?->format('Y-m-d H:i') ?? $slip->generated_at?->format('Y-m-d H:i') ?? 'N/A' }}</td>
+                                <td>{{ $slip->verifiedBy?->name ?? '-' }}</td>
+                                <td>{{ $slip->verified_at?->format('Y-m-d H:i') ?? '-' }}</td>
+                                <td>{{ \Illuminate\Support\Str::limit($slip->payment_remarks ?? '-', 60) }}</td>
                                 <td>
-                                    <form method="POST" action="{{ route('authority.payments.verify', $slip) }}" style="display:inline">
-                                        @csrf
-                                        <button type="submit" class="btn btn-sm btn-success">Verify</button>
-                                    </form>
+                                    @if($slip->payment_status !== 'verified')
+                                        <form method="POST" action="{{ route('authority.payments.verify', $slip) }}" style="display:inline">
+                                            @csrf
+                                            <button type="submit" class="btn btn-sm btn-success">Verify</button>
+                                        </form>
+                                    @else
+                                        <span class="text-success">Verified</span>
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach

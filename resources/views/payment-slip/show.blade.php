@@ -81,6 +81,17 @@
                         </div>
                     </div>
 
+                    @if($paymentSlip->verified_at)
+                        <hr>
+                        <div>
+                            <p><strong>Verified By:</strong> {{ $paymentSlip->verifiedBy?->name ?? $paymentSlip->verified_by }}</p>
+                            <p><strong>Verified At:</strong> {{ $paymentSlip->verified_at?->format('M d, Y H:i') ?? '-' }}</p>
+                            @if($paymentSlip->payment_remarks)
+                                <p><strong>Remarks:</strong> {{ $paymentSlip->payment_remarks }}</p>
+                            @endif
+                        </div>
+                    @endif
+
                 </div>
             </div>
         </div>

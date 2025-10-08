@@ -42,6 +42,47 @@
         </a>
     </li>
 </ul>
+<!-- Reject Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-labelledby="rejectModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="rejectForm" method="POST" action="">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title" id="rejectModalLabel">Reject Payment Slip</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Provide a reason for rejecting the payment slip for <strong id="rejectStudentName"></strong>:</p>
+                    <div class="mb-3">
+                        <textarea name="rejection_reason" class="form-control" rows="4" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Reject</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+        var rejectModal = document.getElementById('rejectModal');
+        rejectModal.addEventListener('show.bs.modal', function (event) {
+                var button = event.relatedTarget;
+                var slipId = button.getAttribute('data-slip-id');
+                var studentName = button.getAttribute('data-student-name');
+                var form = document.getElementById('rejectForm');
+                form.action = '/authority/payments/' + slipId + '/reject';
+                document.getElementById('rejectStudentName').textContent = studentName;
+        });
+});
+</script>
+@endpush
+
 @endsection
 
 @section('content')
@@ -133,13 +174,14 @@
                     <div class="table-responsive">
                         <table class="table table-modern mb-0">
                             <thead>
-                                <tr>
-                                    <th>Student</th>
-                                    <th>Semester</th>
-                                    <th>Amount</th>
-                                    <th>Status</th>
-                                    <th>Date</th>
-                                </tr>
+                                    <tr>
+                                        <th>Student</th>
+                                        <th>Semester</th>
+                                        <th>Amount</th>
+                                        <th>Status</th>
+                                        <th>Approved By</th>
+                                        <th>Approved At</th>
+                                    </tr>
                             </thead>
                             <tbody>
                                 @foreach($recentPayments as $slip)
@@ -159,7 +201,8 @@
                                                 <span class="badge badge-status bg-success">Verified</span>
                                             @endif
                                         </td>
-                                        <td>{{ $slip->created_at->format('M d, Y') }}</td>
+                                        <td>{{ $slip->verifiedBy?->name ?? '-' }}</td>
+                                        <td>{{ $slip->verified_at?->format('M d, Y') ?? '-' }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -174,7 +217,38 @@
             </div>
         </div>
     </div>
-
+    <div class="col-lg-4">
+        <div class="card-modern">
+            <div class="card-header-modern d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-clock-history me-2"></i>Pending Payments</span>
+                <small class="text-muted">{{ $pendingPayments->count() }} pending</small>
+            </div>
+            <div class="card-body">
+                @if(isset($pendingPayments) && $pendingPayments->count() > 0)
+                    <div class="list-group list-group-flush">
+                        @foreach($pendingPayments as $slip)
+                            <div class="list-group-item d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong>{{ optional($slip->student)->name ?? 'Unknown' }}</strong>
+                                    <div class="text-muted small">{{ optional($slip->student)->email ?? '' }}</div>
+                                    <div class="text-muted small">{{ optional($slip->semester)->name ?? '' }} - 																						 											</div>
+                                </div>
+                                <div class="btn-group">
+                                    <form action="{{ route('authority.payments.approve', $slip) }}" method="POST" class="d-inline">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-success">Approve</button>
+                                    </form>
+                                    <button type="button" class="btn btn-sm btn-danger ms-1" data-bs-toggle="modal" data-bs-target="#rejectModal" data-slip-id="{{ $slip->id }}" data-student-name="{{ $slip->student->name }}">Reject</button>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="text-center text-muted">No pending payments</div>
+                @endif
+            </div>
+        </div>
+    </div>
     <div class="col-lg-4">
         <div class="card-modern">
             <div class="card-header-modern">
