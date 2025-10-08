@@ -100,7 +100,8 @@ class AuthorityController extends Controller
     public function createSemester()
     {
         $courses = Course::orderBy('course_code')->get();
-        return view('authority.semesters.create', compact('courses'));
+        $batches = Batch::orderBy('year','desc')->get();
+        return view('authority.semesters.create', compact('courses', 'batches'));
     }
     
     public function storeSemester(Request $request)
@@ -110,6 +111,7 @@ class AuthorityController extends Controller
             'type' => 'required|in:Spring,Summer,Fall',
             'year' => 'required|integer|min:2020|max:2050',
             'semester_number' => 'required|integer|min:1',
+            'batch_id' => 'nullable|exists:batches,id',
             'registration_start_date' => 'required|date',
             'registration_end_date' => 'required|date|after:registration_start_date',
             'semester_start_date' => 'required|date',
@@ -129,6 +131,7 @@ class AuthorityController extends Controller
             // Map request inputs to model columns
             $data = $request->only([
                 'name', 'type', 'year', 'semester_number',
+                'batch_id',
                 'registration_start_date', 'registration_end_date',
                 'semester_start_date', 'semester_end_date', 'is_current'
             ]);
@@ -178,7 +181,8 @@ class AuthorityController extends Controller
     {
         $courses = Course::orderBy('course_code')->get();
         $selected = $semester->semesterCourses()->pluck('course_id')->toArray();
-        return view('authority.semesters.edit', compact('semester', 'courses', 'selected'));
+        $batches = Batch::orderBy('year','desc')->get();
+        return view('authority.semesters.edit', compact('semester', 'courses', 'selected', 'batches'));
     }
     
     public function updateSemester(Request $request, Semester $semester)
@@ -188,6 +192,7 @@ class AuthorityController extends Controller
             'type' => 'required|in:Spring,Summer,Fall',
             'year' => 'required|integer|min:2020|max:2050',
             'semester_number' => 'required|integer|min:1',
+            'batch_id' => 'nullable|exists:batches,id',
             'registration_start_date' => 'required|date',
             'registration_end_date' => 'required|date|after:registration_start_date',
             'semester_start_date' => 'required|date',
@@ -204,6 +209,7 @@ class AuthorityController extends Controller
 
             $data = $request->only([
                 'name', 'type', 'year', 'semester_number',
+                'batch_id',
                 'registration_start_date', 'registration_end_date',
                 'semester_start_date', 'semester_end_date', 'is_current'
             ]);

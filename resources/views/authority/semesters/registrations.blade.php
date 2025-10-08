@@ -6,6 +6,7 @@
 @section('content')
 <div class="mb-4 d-flex justify-content-between align-items-center">
     <h3 class="mb-0">Registrations for {{ $semester->name }} ({{ $semester->year }})</h3>
+    <div class="text-muted">For: <strong>{{ $semester->batch?->name ?? 'All Batches' }}</strong></div>
     <a href="{{ route('authority.semesters') }}" class="btn btn-secondary">Back to Semesters</a>
 </div>
 
