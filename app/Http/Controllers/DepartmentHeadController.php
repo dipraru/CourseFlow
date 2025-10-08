@@ -92,36 +92,85 @@ class DepartmentHeadController extends Controller
             $existingSlip = PaymentSlip::where('student_id', $student->id)
                 ->where('semester_id', $semester->id)
                 ->first();
-            
-            if (!$existingSlip) {
-                // Get fee structure
-                // Some installations may not yet have the fees.batch_id column (migration pending).
-                // Check the schema and fall back to a semester-only fee when batch_id is not available.
-                $fee = null;
-                if (Schema::hasColumn('fees', 'batch_id') && !empty($student->profile->batch_id)) {
-                    // Try batch-specific fee first
-                    $fee = Fee::where('batch_id', $student->profile->batch_id)
-                        ->where('semester_id', $semester->id)
-                        ->first();
-                }
-                
-                // Always fall back to a semester-level fee when batch-specific fee is not found
-                if (! $fee) {
-                    $fee = Fee::where('semester_id', $semester->id)->first();
-                }
-                
-                if ($fee) {
-                    // Compute credit hours and total amount for the payment slip
-                    $course = $registration->semesterCourse->course ?? null;
-                    $creditHours = $course->credit_hours ?? 0;
-                    
-                    // Calculate total using fee components (fallback zeros to avoid null arithmetic)
-                    $totalAmount = (float)($fee->per_credit_fee ?? 0) * (float)$creditHours
+
+            // Get fee structure
+            $fee = null;
+            if (Schema::hasColumn('fees', 'batch_id') && !empty($student->profile->batch_id)) {
+                // Try batch-specific fee first
+                $fee = Fee::where('batch_id', $student->profile->batch_id)
+                    ->where('semester_id', $semester->id)
+                    ->first();
+            }
+
+            // Always fall back to a semester-level fee when batch-specific fee is not found
+            if (! $fee) {
+                $fee = Fee::where('semester_id', $semester->id)->first();
+            }
+
+            // Build current course info
+            $course = $registration->semesterCourse->course ?? null;
+            $courseEntry = null;
+            $courseCredit = 0;
+            if ($course) {
+                $courseEntry = [
+                    'id' => $course->id,
+                    'code' => $course->course_code ?? null,
+                    'name' => $course->course_name ?? null,
+                    'credit_hours' => (float)($course->credit_hours ?? 0),
+                ];
+                $courseCredit = (float)($course->credit_hours ?? 0);
+            }
+
+            if ($fee) {
+                // If there's an existing slip, append the course (if missing) and recalc totals.
+                if ($existingSlip) {
+                    $registered = $existingSlip->registered_courses ?? [];
+
+                    // append if not already present
+                    $found = false;
+                    if ($courseEntry) {
+                        foreach ($registered as $rc) {
+                            if (isset($rc['id']) && $rc['id'] == $courseEntry['id']) {
+                                $found = true;
+                                break;
+                            }
+                        }
+                        if (! $found) {
+                            $registered[] = $courseEntry;
+                        }
+                    }
+
+                    // Recalculate credit hours and totals
+                    $totalCreditHours = array_sum(array_map(function ($c) { return (float)($c['credit_hours'] ?? 0); }, $registered));
+                    $perCredit = (float)($fee->per_credit_fee ?? 0);
+                    $otherFees = (float)($fee->admission_fee ?? 0) + (float)($fee->library_fee ?? 0) + (float)($fee->lab_fee ?? 0) + (float)($fee->other_fees ?? 0);
+                    $newTotal = $perCredit * $totalCreditHours + $otherFees;
+
+                    $existingSlip->update([
+                        'registered_courses' => $registered,
+                        'credit_hours' => $totalCreditHours,
+                        'total_amount' => $newTotal,
+                        'fee_breakdown' => array_merge($existingSlip->fee_breakdown ?? [], [
+                            'per_credit_fee' => $perCredit,
+                            'credit_hours' => $totalCreditHours,
+                            'calculated_total' => $newTotal,
+                        ]),
+                    ]);
+
+                } else {
+                    // No existing slip: create a new one for this student/semester. Use computed credit hours and fee breakdown.
+                    $registeredCourses = [];
+                    if ($courseEntry) {
+                        $registeredCourses[] = $courseEntry;
+                    }
+
+                    $creditHours = $courseCredit;
+                    $totalAmount = $perCredit = (float)($fee->per_credit_fee ?? 0) * (float)$creditHours
                         + (float)($fee->admission_fee ?? 0)
                         + (float)($fee->library_fee ?? 0)
                         + (float)($fee->lab_fee ?? 0)
                         + (float)($fee->other_fees ?? 0);
-                    
+
                     $feeBreakdown = [
                         'per_credit_fee' => (float)($fee->per_credit_fee ?? 0),
                         'credit_hours' => (float)$creditHours,
@@ -131,35 +180,23 @@ class DepartmentHeadController extends Controller
                         'other_fees' => (float)($fee->other_fees ?? 0),
                         'calculated_total' => (float)$totalAmount,
                     ];
-                    
-                    $registeredCourses = [];
-                    if ($course) {
-                        $registeredCourses[] = [
-                            'id' => $course->id,
-                            'code' => $course->course_code ?? null,
-                            'name' => $course->course_name ?? null,
-                            'credit_hours' => (float)($course->credit_hours ?? 0),
-                        ];
-                    }
-                    
-                     // Generate slip number (format: SEMESTER_YEAR-BATCH-STUDENT_ID)
-                     $slipNumber = strtoupper($semester->name) . '-' . 
-                                  $student->profile->batch->name . '-' . 
-                                  str_pad($student->id, 4, '0', STR_PAD_LEFT);
-                     
-                     PaymentSlip::create([
-                         'student_id' => $student->id,
-                         'semester_id' => $semester->id,
-                         'slip_number' => $slipNumber,
-                         'total_amount' => $totalAmount,
-                         'credit_hours' => $creditHours,
-                         'fee_breakdown' => $feeBreakdown,
-                         'registered_courses' => $registeredCourses,
-                         'payment_status' => 'unpaid',
-                         'generated_at' => now(),
-                     ]);
-                 }
-             }
+
+                    $batchName = optional(optional($student->profile)->batch)->name ?? 'BATCH';
+                    $slipNumber = strtoupper($semester->name) . '-' . $batchName . '-' . str_pad($student->id, 4, '0', STR_PAD_LEFT);
+
+                    PaymentSlip::create([
+                        'student_id' => $student->id,
+                        'semester_id' => $semester->id,
+                        'slip_number' => $slipNumber,
+                        'total_amount' => $totalAmount,
+                        'credit_hours' => $creditHours,
+                        'fee_breakdown' => $feeBreakdown,
+                        'registered_courses' => $registeredCourses,
+                        'payment_status' => 'unpaid',
+                        'generated_at' => now(),
+                    ]);
+                }
+            }
             
             DB::commit();
             
