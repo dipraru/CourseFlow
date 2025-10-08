@@ -203,5 +203,8 @@ class DatabaseSeeder extends Seeder
             'fee_description' => 'Fall 2024 fee structure',
             'is_active' => true,
         ]);
+
+        // Populate demo profile data for sample students
+        $this->call(DemoStudentProfileSeeder::class);
     }
 }

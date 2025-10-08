@@ -23,6 +23,12 @@
             <span>My Registrations</span>
         </a>
     </li>
+    <li class="nav-item">
+        <a href="{{ route('profile.edit') }}" class="nav-link">
+            <i class="bi bi-person-circle"></i>
+            <span>View Profile</span>
+        </a>
+    </li>
 </ul>
 @endsection
 

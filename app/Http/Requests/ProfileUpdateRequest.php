@@ -15,6 +15,24 @@ class ProfileUpdateRequest extends FormRequest
      */
     public function rules(): array
     {
+        $user = $this->user();
+
+        // Students are allowed to edit only email and phone (and address if you want).
+        if ($user && $user->isStudent()) {
+            return [
+                'email' => [
+                    'required',
+                    'string',
+                    'lowercase',
+                    'email',
+                    'max:255',
+                    Rule::unique(User::class)->ignore($this->user()->id),
+                ],
+                'phone' => ['nullable', 'string', 'max:30'],
+                'address' => ['nullable', 'string', 'max:1000'],
+            ];
+        }
+
         return [
             'name' => ['required', 'string', 'max:255'],
             'email' => [
@@ -25,6 +43,9 @@ class ProfileUpdateRequest extends FormRequest
                 'max:255',
                 Rule::unique(User::class)->ignore($this->user()->id),
             ],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'address' => ['nullable', 'string', 'max:1000'],
+            'batch_id' => ['nullable', 'exists:batches,id'],
         ];
     }
 }
