@@ -94,8 +94,7 @@
 			</div>
 			<div class="col-md-6">
 				<label class="form-label">Semester End</label>
-				<input type="date" name="semester_end_date" value="{{ old('semester_end_date') }}" class="form-control">
-				@error('semester_end_date')<div class="text-danger small">{{ $message }}</div>@enderror
+				<div class="form-text small text-muted">Semester end date is set automatically when the next semester for this batch is created.</div>
 			</div>
 		</div>
 

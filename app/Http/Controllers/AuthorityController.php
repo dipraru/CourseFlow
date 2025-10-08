@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
 
 class AuthorityController extends Controller
 {
@@ -109,12 +110,11 @@ class AuthorityController extends Controller
             'name' => 'required|string|max:50|unique:semesters',
             'type' => 'required|in:Spring,Summer,Fall',
             'year' => 'required|integer|min:2020|max:2050',
-            'semester_number' => 'required|integer|min:1',
+            // semester_number is determined server-side
             'batch_year' => 'nullable|integer|min:2000|max:2100|exists:batches,year',
             'registration_start_date' => 'required|date',
             'registration_end_date' => 'required|date|after:registration_start_date',
             'semester_start_date' => 'required|date',
-            'semester_end_date' => 'required|date|after:semester_start_date',
             'courses' => 'nullable|array',
             'courses.*' => 'exists:courses,id',
         ]);
@@ -173,7 +173,27 @@ class AuthorityController extends Controller
 
             $createdSemester = Semester::create($data);
 
-            // Deactivate and lock other semesters for the same batch
+            // End the previous semester for the same batch (set its end date to day before new semester start)
+            $previousQuery = Semester::where(function($q) use ($createdSemester) {
+                if (is_null($createdSemester->batch_id)) {
+                    $q->whereNull('batch_id');
+                } else {
+                    $q->where('batch_id', $createdSemester->batch_id);
+                }
+            })->where('id', '<>', $createdSemester->id)
+              ->where('semester_number', '<', $createdSemester->semester_number)
+              ->orderBy('semester_number', 'desc');
+            $previous = $previousQuery->first();
+            if ($previous && !empty($createdSemester->semester_start_date)) {
+                try {
+                    $endDate = Carbon::parse($createdSemester->semester_start_date)->subDay()->toDateString();
+                    $previous->update(['semester_end_date' => $endDate, 'is_active' => false, 'is_current' => false, 'is_locked' => true]);
+                } catch (\Throwable $e) {
+                    // ignore date parse errors
+                }
+            }
+
+            // Deactivate and lock other semesters for the same batch (rest)
             Semester::where('id', '<>', $createdSemester->id)
                 ->where(function($q) use ($createdSemester) {
                     if (is_null($createdSemester->batch_id)) {
@@ -185,7 +205,8 @@ class AuthorityController extends Controller
                 ->update(['is_active' => false, 'is_current' => false, 'is_locked' => true]);
 
             // Automatically attach courses whose intended_semester matches the selected semester_number
-            $intended = (int) $request->input('semester_number');
+            // Use the created semester's computed semester_number as the intended semester
+            $intended = (int) $createdSemester->semester_number;
             $coursesToAttach = Course::where('intended_semester', $intended)->pluck('id')->toArray();
             foreach ($coursesToAttach as $courseId) {
                 SemesterCourse::create([
