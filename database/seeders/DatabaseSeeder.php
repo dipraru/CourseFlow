@@ -68,9 +68,10 @@ class DatabaseSeeder extends Seeder
 
         \App\Models\UserProfile::updateOrCreate(['user_id' => $advisor2->id], ['phone' => '+1234567893', 'department' => 'Computer Science', 'designation' => 'Assistant Professor']);
 
-        // Create Batches
-        $batch2023 = Batch::updateOrCreate(['name' => 'Batch 2023'], ['year' => 2023, 'total_semesters' => 8, 'is_active' => true]);
-        $batch2024 = Batch::updateOrCreate(['name' => 'Batch 2024'], ['year' => 2024, 'total_semesters' => 8, 'is_active' => true]);
+    // Create Batches
+    $batch2022 = Batch::updateOrCreate(['name' => 'Batch 2022'], ['year' => 2022, 'total_semesters' => 8, 'is_active' => true]);
+    $batch2023 = Batch::updateOrCreate(['name' => 'Batch 2023'], ['year' => 2023, 'total_semesters' => 8, 'is_active' => true]);
+    $batch2024 = Batch::updateOrCreate(['name' => 'Batch 2024'], ['year' => 2024, 'total_semesters' => 8, 'is_active' => true]);
 
         // Create Sample Students for Batch 2024
          for ($i = 1; $i <= 5; $i++) {
@@ -92,7 +93,7 @@ class DatabaseSeeder extends Seeder
         // Create Semesters
         $semester = Semester::updateOrCreate(
             ['name' => 'Fall 2024', 'year' => 2024],
-            ['type' => 'Fall', 'semester_number' => 1, 'registration_start_date' => '2024-08-01', 'registration_end_date' => '2024-08-15', 'semester_start_date' => '2024-09-01', 'semester_end_date' => '2024-12-31', 'is_active' => true, 'is_current' => true]
+            ['type' => 'Fall', 'semester_number' => 1, 'registration_start_date' => '2024-08-01', 'registration_end_date' => '2024-08-15', 'semester_start_date' => '2024-09-01', 'semester_end_date' => '2024-12-31', 'is_active' => true, 'is_current' => true, 'batch_id' => $batch2022->id]
         );
 
         // Create Courses
