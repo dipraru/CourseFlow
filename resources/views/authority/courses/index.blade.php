@@ -59,6 +59,11 @@
                                 <td>{{ $course->semester_courses_count }}</td>
                                 <td class="text-end">
                                     <a href="{{ route('authority.courses.edit', $course) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                    <form action="{{ route('authority.courses.destroy', $course) }}" method="POST" class="d-inline-block" onsubmit="return confirm('Delete this course? This cannot be undone.');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-sm btn-outline-danger ms-2">Delete</button>
+                                    </form>
                                 </td>
                             </tr>
                         @endforeach

@@ -82,6 +82,7 @@ Route::middleware(['auth', 'role:authority'])->prefix('authority')->name('author
     Route::get('/courses/{course}/edit', [AuthorityController::class, 'editCourse'])->name('courses.edit');
     Route::post('/courses', [AuthorityController::class, 'storeCourse'])->name('courses.store');
     Route::patch('/courses/{course}', [AuthorityController::class, 'updateCourse'])->name('courses.update');
+    Route::delete('/courses/{course}', [AuthorityController::class, 'destroyCourse'])->name('courses.destroy');
     
     // User Management
     Route::get('/users', [AuthorityController::class, 'users'])->name('users');
