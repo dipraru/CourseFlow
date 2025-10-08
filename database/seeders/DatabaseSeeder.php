@@ -206,5 +206,8 @@ class DatabaseSeeder extends Seeder
 
         // Populate demo profile data for sample students
         $this->call(DemoStudentProfileSeeder::class);
+
+        // Populate demo courses across 12 semesters
+        $this->call(DemoCoursesSeeder::class);
     }
 }

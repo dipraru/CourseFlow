@@ -11,6 +11,7 @@ class Semester extends Model
 
     protected $fillable = [
         'name',
+        'batch_id',
         'type',
         'year',
         'semester_number',
@@ -37,6 +38,11 @@ class Semester extends Model
     public function semesterCourses()
     {
         return $this->hasMany(SemesterCourse::class);
+    }
+
+    public function batch()
+    {
+        return $this->belongsTo(Batch::class);
     }
 
     public function courseRegistrations()

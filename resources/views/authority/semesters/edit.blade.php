@@ -46,6 +46,19 @@
 			</div>
 		</div>
 
+			<div class="row g-3 mt-3">
+				<div class="col-md-6">
+					<label class="form-label">For Batch (optional)</label>
+					<select name="batch_id" class="form-select">
+						<option value="">All Batches</option>
+						@foreach($batches as $batch)
+							<option value="{{ $batch->id }}" {{ old('batch_id', $semester->batch_id) == $batch->id ? 'selected' : '' }}>{{ $batch->name }}</option>
+						@endforeach
+					</select>
+					@error('batch_id')<div class="text-danger small">{{ $message }}</div>@enderror
+				</div>
+			</div>
+
 		<hr class="my-4">
 
 		<div class="row g-3">
