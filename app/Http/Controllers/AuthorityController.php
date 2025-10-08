@@ -340,7 +340,23 @@ class AuthorityController extends Controller
     // Course Management
     public function courses()
     {
-        $courses = Course::withCount('semesterCourses')->paginate(15);
+        $query = Course::query();
+
+        // Search by code or name
+        if (request()->filled('q')) {
+            $q = request()->get('q');
+            $query->where(function($qry) use ($q) {
+                $qry->where('course_code', 'like', "%{$q}%")
+                    ->orWhere('course_name', 'like', "%{$q}%");
+            });
+        }
+
+        // Filter by intended_semester (1..12)
+        if (request()->filled('semester')) {
+            $query->where('intended_semester', request()->get('semester'));
+        }
+
+        $courses = $query->withCount('semesterCourses')->orderBy('course_code')->paginate(20)->withQueryString();
         return view('authority.courses.index', compact('courses'));
     }
     

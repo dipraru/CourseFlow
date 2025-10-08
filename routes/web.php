@@ -78,6 +78,8 @@ Route::middleware(['auth', 'role:authority'])->prefix('authority')->name('author
     
     // Course Management
     Route::get('/courses', [AuthorityController::class, 'courses'])->name('courses');
+    Route::get('/courses/create', [AuthorityController::class, 'createCourse'])->name('courses.create');
+    Route::get('/courses/{course}/edit', [AuthorityController::class, 'editCourse'])->name('courses.edit');
     Route::post('/courses', [AuthorityController::class, 'storeCourse'])->name('courses.store');
     Route::patch('/courses/{course}', [AuthorityController::class, 'updateCourse'])->name('courses.update');
     
