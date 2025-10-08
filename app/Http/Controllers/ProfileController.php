@@ -80,11 +80,12 @@ class ProfileController extends Controller
             $profileData['phone'] = $request->input('phone');
         }
 
-        // Students are not allowed to edit address/batch via this form
+        // Students are allowed to edit address now per request
+        if ($request->filled('address')) {
+            $profileData['address'] = $request->input('address');
+        }
+
         if (! $user->isStudent()) {
-            if ($request->filled('address')) {
-                $profileData['address'] = $request->input('address');
-            }
             if ($request->filled('batch_id')) {
                 $profileData['batch_id'] = $request->input('batch_id');
             }

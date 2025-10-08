@@ -28,7 +28,7 @@
             @endif
         </div>
 
-                <textarea id="address" name="address" class="mt-1 block w-full form-textarea">{{ old('address', optional($user->profile)->address) }}</textarea>
+        <div>
             <x-input-label for="phone" :value="__('Phone')" />
             <x-text-input id="phone" name="phone" type="text" class="mt-1 block w-full" :value="old('phone', optional($user->profile)->phone)" autocomplete="tel" />
             <x-input-error class="mt-2" :messages="$errors->get('phone')" />

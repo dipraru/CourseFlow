@@ -26,7 +26,7 @@
     <li class="nav-item">
         <a href="{{ route('profile.edit') }}" class="nav-link">
             <i class="bi bi-person-circle"></i>
-            <span>My Profile</span>
+            <span>View Profile</span>
         </a>
     </li>
 </ul>

@@ -32,6 +32,7 @@ class DemoStudentProfileSeeder extends Seeder
                 'mother_name' => "Mother of Student {$i}",
                 'address' => "123 Demo St, City {$i}",
                 'roll_number' => 'ROLL' . str_pad($i, 4, '0', STR_PAD_LEFT),
+                'date_of_birth' => now()->subYears(18 + $i)->format('Y-m-d'),
             ];
 
             $profile->update($demo);
