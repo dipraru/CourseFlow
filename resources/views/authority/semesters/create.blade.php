@@ -98,6 +98,7 @@
 			<div id="auto-courses" class="border rounded p-2" style="min-height:120px; background:#f8f9fa;">
 				<div class="text-muted">Select a semester number above to see the courses that will be attached automatically.</div>
 			</div>
+			<div id="auto-courses-meta" class="mt-2 small text-muted"></div>
 			<small class="text-muted">Courses are auto-selected from the course catalog based on Intended Semester. You don't need to choose them manually.</small>
 		</div>
 
@@ -112,10 +113,11 @@
 document.addEventListener('DOMContentLoaded', function(){
 	const semInput = document.querySelector('input[name="semester_number"]');
 	const autoDiv = document.getElementById('auto-courses');
-	function loadCourses(){
+		function loadCourses(){
 		const val = semInput.value || 0;
 		if (!val || val < 1 || val > 12) {
 			autoDiv.innerHTML = '<div class="text-muted">Select a semester number above to see the courses that will be attached automatically.</div>';
+			document.getElementById('auto-courses-meta').innerHTML = '';
 			return;
 		}
 		autoDiv.innerHTML = '<div class="text-muted">Loading courses...</div>';
@@ -123,6 +125,11 @@ document.addEventListener('DOMContentLoaded', function(){
 			.then(r => r.json())
 			.then(data => {
 				if (data && data.length) {
+					// compute counts
+					const theory = data.filter(c => c.course_type === 'theory' || c.course_type === 'theory_lab').length;
+					const lab = data.filter(c => c.course_type === 'lab' || c.course_type === 'theory_lab').length;
+					document.getElementById('auto-courses-meta').innerHTML = `<strong>Theory:</strong> ${theory} &nbsp; — &nbsp; <strong>Lab:</strong> ${lab}`;
+
 					let html = '<ul class="list-unstyled mb-0">';
 					data.forEach(c => {
 						html += `<li>${c.course_code} — ${c.course_name} <small class="text-muted">(${c.course_type})</small></li>`;
@@ -131,6 +138,7 @@ document.addEventListener('DOMContentLoaded', function(){
 					autoDiv.innerHTML = html;
 				} else {
 					autoDiv.innerHTML = '<div class="text-muted">No courses found for this semester.</div>';
+					document.getElementById('auto-courses-meta').innerHTML = '';
 				}
 			}).catch(()=>{
 				autoDiv.innerHTML = '<div class="text-danger">Failed to load courses.</div>';
