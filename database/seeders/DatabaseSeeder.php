@@ -20,123 +20,83 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // Create Department Head
-        $departmentHead = User::create([
-            'name' => 'Dr. John Smith',
-            'email' => 'head@cs.edu',
-            'password' => Hash::make('password'),
-            'role' => 'department_head',
-            'user_id' => 'HEAD001',
-            'is_active' => true,
-        ]);
+        $departmentHead = User::updateOrCreate(
+            ['email' => 'head@cs.edu'],
+            [
+                'name' => 'Dr. John Smith',
+                'password' => Hash::make('password'),
+                'role' => 'department_head',
+                'user_id' => 'HEAD001',
+                'is_active' => true,
+            ]
+        );
 
-        UserProfile::create([
-            'user_id' => $departmentHead->id,
-            'phone' => '+1234567890',
-            'department' => 'Computer Science',
-            'designation' => 'Department Head & Professor',
-        ]);
+        \App\Models\UserProfile::updateOrCreate(
+            ['user_id' => $departmentHead->id],
+            ['phone' => '+1234567890', 'department' => 'Computer Science', 'designation' => 'Department Head & Professor']
+        );
 
         // Create Authority User
-        $authority = User::create([
-            'name' => 'Admin User',
-            'email' => 'admin@cs.edu',
-            'password' => Hash::make('password'),
-            'role' => 'authority',
-            'user_id' => 'ADMIN001',
-            'is_active' => true,
-        ]);
+        $authority = User::updateOrCreate(
+            ['email' => 'admin@cs.edu'],
+            [
+                'name' => 'Admin User',
+                'password' => Hash::make('password'),
+                'role' => 'authority',
+                'user_id' => 'ADMIN001',
+                'is_active' => true,
+            ]
+        );
 
-        UserProfile::create([
-            'user_id' => $authority->id,
-            'phone' => '+1234567891',
-            'department' => 'Computer Science',
-            'designation' => 'Administrative Officer',
-        ]);
+        \App\Models\UserProfile::updateOrCreate(
+            ['user_id' => $authority->id],
+            ['phone' => '+1234567891', 'department' => 'Computer Science', 'designation' => 'Administrative Officer']
+        );
 
         // Create Advisors
-        $advisor1 = User::create([
-            'name' => 'Dr. Sarah Johnson',
-            'email' => 'advisor1@cs.edu',
-            'password' => Hash::make('password'),
-            'role' => 'advisor',
-            'user_id' => 'ADV001',
-            'is_active' => true,
-        ]);
+        $advisor1 = User::updateOrCreate(
+            ['email' => 'advisor1@cs.edu'],
+            ['name' => 'Dr. Sarah Johnson', 'password' => Hash::make('password'), 'role' => 'advisor', 'user_id' => 'ADV001', 'is_active' => true]
+        );
 
-        UserProfile::create([
-            'user_id' => $advisor1->id,
-            'phone' => '+1234567892',
-            'department' => 'Computer Science',
-            'designation' => 'Associate Professor',
-        ]);
+        \App\Models\UserProfile::updateOrCreate(['user_id' => $advisor1->id], ['phone' => '+1234567892', 'department' => 'Computer Science', 'designation' => 'Associate Professor']);
 
-        $advisor2 = User::create([
-            'name' => 'Dr. Michael Brown',
-            'email' => 'advisor2@cs.edu',
-            'password' => Hash::make('password'),
-            'role' => 'advisor',
-            'user_id' => 'ADV002',
-            'is_active' => true,
-        ]);
+        $advisor2 = User::updateOrCreate(
+            ['email' => 'advisor2@cs.edu'],
+            ['name' => 'Dr. Michael Brown', 'password' => Hash::make('password'), 'role' => 'advisor', 'user_id' => 'ADV002', 'is_active' => true]
+        );
 
-        UserProfile::create([
-            'user_id' => $advisor2->id,
-            'phone' => '+1234567893',
-            'department' => 'Computer Science',
-            'designation' => 'Assistant Professor',
-        ]);
+        \App\Models\UserProfile::updateOrCreate(['user_id' => $advisor2->id], ['phone' => '+1234567893', 'department' => 'Computer Science', 'designation' => 'Assistant Professor']);
 
         // Create Batches
-        $batch2023 = Batch::create([
-            'name' => 'Batch 2023',
-            'year' => 2023,
-            'total_semesters' => 8,
-            'is_active' => true,
-        ]);
-
-        $batch2024 = Batch::create([
-            'name' => 'Batch 2024',
-            'year' => 2024,
-            'total_semesters' => 8,
-            'is_active' => true,
-        ]);
+        $batch2023 = Batch::updateOrCreate(['name' => 'Batch 2023'], ['year' => 2023, 'total_semesters' => 8, 'is_active' => true]);
+        $batch2024 = Batch::updateOrCreate(['name' => 'Batch 2024'], ['year' => 2024, 'total_semesters' => 8, 'is_active' => true]);
 
         // Create Sample Students for Batch 2024
-        for ($i = 1; $i <= 5; $i++) {
-            $student = User::create([
-                'name' => "Student $i",
-                'email' => "student$i@cs.edu",
-                'password' => Hash::make('password'),
-                'role' => 'student',
-                'user_id' => 'STU' . str_pad($i, 4, '0', STR_PAD_LEFT),
-                'is_active' => true,
-            ]);
+         for ($i = 1; $i <= 5; $i++) {
+            $student = User::updateOrCreate(
+                ['email' => "student$i@cs.edu"],
+                ['name' => "Student $i", 'password' => Hash::make('password'), 'role' => 'student', 'user_id' => 'STU' . str_pad($i, 4, '0', STR_PAD_LEFT), 'is_active' => true]
+            );
 
-            UserProfile::create([
-                'user_id' => $student->id,
+            \App\Models\UserProfile::updateOrCreate([
+                'user_id' => $student->id
+            ], [
                 'batch_id' => $batch2024->id,
                 'advisor_id' => $i <= 2 ? $advisor1->id : $advisor2->id,
                 'phone' => '+1234567' . str_pad($i, 3, '0', STR_PAD_LEFT),
                 'department' => 'Computer Science',
             ]);
-        }
+         }
 
         // Create Semesters
-        $semester = Semester::create([
-            'name' => 'Fall 2024',
-            'type' => 'Fall',
-            'year' => 2024,
-            'semester_number' => 1,
-            'registration_start_date' => '2024-08-01',
-            'registration_end_date' => '2024-08-15',
-            'semester_start_date' => '2024-09-01',
-            'semester_end_date' => '2024-12-31',
-            'is_active' => true,
-            'is_current' => true,
-        ]);
+        $semester = Semester::updateOrCreate(
+            ['name' => 'Fall 2024', 'year' => 2024],
+            ['type' => 'Fall', 'semester_number' => 1, 'registration_start_date' => '2024-08-01', 'registration_end_date' => '2024-08-15', 'semester_start_date' => '2024-09-01', 'semester_end_date' => '2024-12-31', 'is_active' => true, 'is_current' => true]
+        );
 
         // Create Courses
-        $courses = [
+         $courses = [
             [
                 'course_code' => 'CSE101',
                 'course_name' => 'Introduction to Programming',
@@ -180,21 +140,23 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($courses as $courseData) {
-            $course = Course::create($courseData);
-            
-            // Add courses to current semester
-            SemesterCourse::create([
+            $course = Course::updateOrCreate(['course_code' => $courseData['course_code']], $courseData);
+
+            // Add courses to current semester (idempotent)
+            \App\Models\SemesterCourse::updateOrCreate([
                 'semester_id' => $semester->id,
                 'course_id' => $course->id,
+            ], [
                 'max_students' => 60,
                 'enrolled_students' => 0,
                 'is_available' => true,
             ]);
-        }
+         }
 
         // Create Fee Structure for the semester
-        Fee::create([
+        Fee::updateOrCreate([
             'semester_id' => $semester->id,
+        ], [
             'per_credit_fee' => 500.00,
             'admission_fee' => 1000.00,
             'library_fee' => 200.00,
