@@ -150,10 +150,20 @@ class AuthorityController extends Controller
 
             // Map request inputs to model columns
             $data = $request->only([
-                'name', 'type', 'year', 'semester_number',
+                'name', 'type', 'year',
                 'registration_start_date', 'registration_end_date',
                 'semester_start_date', 'semester_end_date'
             ]);
+            // Determine semester_number automatically based on batch history
+            // If no batch is provided, use 0 as requested
+            if ($batchId) {
+                $last = Semester::where('batch_id', $batchId)->orderBy('semester_number', 'desc')->first();
+                $nextNumber = $last ? ($last->semester_number + 1) : 1;
+            } else {
+                // No batch provided -> semester number should be 0
+                $nextNumber = 0;
+            }
+            $data['semester_number'] = $nextNumber;
             // set batch_id if resolved
             $data['batch_id'] = $batchId;
 
@@ -350,6 +360,34 @@ class AuthorityController extends Controller
             DB::rollBack();
             return back()->with('error', 'Failed to activate semester.');
         }
+    }
+
+    /**
+     * Return the next semester number for a given batch_year (query param).
+     * GET /authority/semesters/next-number?batch_year=2024
+     */
+    public function nextSemesterNumber(Request $request)
+    {
+        $request->validate([
+            'batch_year' => 'nullable|integer|min:2000|max:2100',
+        ]);
+
+        $batchYear = $request->query('batch_year');
+        $batchId = null;
+        if ($batchYear) {
+            $batch = Batch::where('year', $batchYear)->first();
+            $batchId = $batch?->id;
+        }
+
+        // If no batch year provided, return 0 as the semantic for "no batch"
+        if (empty($batchYear)) {
+            return response()->json(['next' => 0]);
+        }
+
+        $last = Semester::where('batch_id', $batchId)->orderBy('semester_number', 'desc')->first();
+        $next = $last ? ($last->semester_number + 1) : 1;
+
+        return response()->json(['next' => $next]);
     }
 
     public function destroySemester(Semester $semester)
@@ -785,7 +823,7 @@ class AuthorityController extends Controller
         $paymentSlip->update([
             'payment_status' => 'verified',
             'verified_at' => now(),
-            'verified_by' => auth()->id(),
+            'verified_by' => Auth::id(),
             'payment_remarks' => $request->payment_remarks,
         ]);
         

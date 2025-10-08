@@ -46,6 +46,7 @@
                                     <th>Name</th>
                                     <th>Type</th>
                                     <th>Year</th>
+                                    <th>Sem #</th>
                                     <th>Batch</th>
                                     <th>Courses</th>
                                     <th>Active</th>
@@ -58,6 +59,7 @@
                                             <td>{{ $semester->name }}</td>
                                             <td>{{ ucfirst($semester->type ?? 'n/a') }}</td>
                                             <td>{{ $semester->year }}</td>
+                                            <td>{{ $semester->semester_number ?? 0 }}</td>
                                             <td>{{ $semester->batch?->name ?? 'All Batches' }}</td>
                                             <td>{{ $semester->semester_courses_count ?? 0 }}</td>
                                             <td>

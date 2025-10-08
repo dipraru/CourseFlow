@@ -56,7 +56,8 @@
 
 			<div class="col-md-4">
 				<label class="form-label">Semester Number</label>
-				<input type="number" name="semester_number" value="{{ old('semester_number', 1) }}" class="form-control">
+				<input type="number" name="semester_number" value="{{ old('semester_number', 1) }}" class="form-control" readonly>
+				<div class="form-text small text-muted">Automatically selected based on the batch's last semester. Not editable.</div>
 				@error('semester_number')<div class="text-danger small">{{ $message }}</div>@enderror
 			</div>
 		</div>
@@ -122,6 +123,7 @@
 document.addEventListener('DOMContentLoaded', function(){
 	const semInput = document.querySelector('input[name="semester_number"]');
 	const autoDiv = document.getElementById('auto-courses');
+	const batchInput = document.querySelector('input[name="batch_year"]');
 		function loadCourses(){
 		const val = semInput.value || 0;
 		if (!val || val < 1 || val > 12) {
@@ -154,8 +156,47 @@ document.addEventListener('DOMContentLoaded', function(){
 			});
 	}
 	semInput.addEventListener('input', loadCourses);
+
+	// Fetch next semester number when batch year changes
+	let latestRequestedBatch = null;
+	async function loadNextSemesterNumber() {
+		const year = batchInput.value || '';
+		latestRequestedBatch = year;
+		try {
+			if (!year) {
+				// no batch -> sem number should be 0
+				// only apply if the requested batch is still empty
+				if (latestRequestedBatch === year) {
+					semInput.value = 0;
+					loadCourses();
+				}
+				return;
+			}
+			const url = new URL('{{ route("authority.semesters.next_number") }}', window.location.origin);
+			url.searchParams.set('batch_year', year);
+			const res = await fetch(url.toString());
+			if (!res.ok) throw new Error('Failed');
+			const data = await res.json();
+			// Only apply the result if the batch input hasn't changed since this request
+			if (latestRequestedBatch === year) {
+				semInput.value = data.next ?? 1;
+				// trigger course load for this new number
+				loadCourses();
+			}
+		} catch (err) {
+			// On error, do not overwrite a correct already-displayed value.
+			// If the batch input is empty and this request was for empty, ensure 0.
+			if (!year && latestRequestedBatch === year) {
+				semInput.value = 0;
+				loadCourses();
+			}
+			// otherwise leave semInput as-is
+		}
+	}
+
+	batchInput.addEventListener('input', loadNextSemesterNumber);
 	// initial load
-	loadCourses();
+	loadNextSemesterNumber();
 });
 </script>
 @endpush

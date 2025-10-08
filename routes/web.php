@@ -71,6 +71,8 @@ Route::middleware(['auth', 'role:authority'])->prefix('authority')->name('author
     Route::get('/semesters', [AuthorityController::class, 'semesters'])->name('semesters');
     Route::get('/semesters/create', [AuthorityController::class, 'createSemester'])->name('semesters.create');
     Route::post('/semesters', [AuthorityController::class, 'storeSemester'])->name('semesters.store');
+    // Endpoint to get next semester number for a given batch year (used by create UI)
+    Route::get('/semesters/next-number', [AuthorityController::class, 'nextSemesterNumber'])->name('semesters.next_number');
     // No edit route per request (authority edits not required)
     Route::delete('/semesters/{semester}', [AuthorityController::class, 'destroySemester'])->name('semesters.destroy');
     Route::get('/semesters/{semester}/registrations', [AuthorityController::class, 'semesterRegistrations'])->name('semesters.registrations');
