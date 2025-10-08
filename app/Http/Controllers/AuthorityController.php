@@ -372,10 +372,38 @@ class AuthorityController extends Controller
             'course_name' => 'required|string|max:200',
             'credits' => 'required|numeric|min:0|max:10',
             'description' => 'nullable|string',
+            'intended_semester' => 'required|integer|min:1|max:12',
+            'course_type' => 'required|in:theory,lab,theory_lab',
         ]);
-        
-        Course::create($request->all());
-        
+
+        $sem = (int) $request->input('intended_semester');
+        $type = $request->input('course_type');
+
+        // Enforce limits: max 5 theory, max 4 lab per semester.
+        $theoryCount = Course::where('intended_semester', $sem)
+            ->where(function($q){ $q->where('course_type','theory')->orWhere('course_type','theory_lab'); })->count();
+        $labCount = Course::where('intended_semester', $sem)
+            ->where(function($q){ $q->where('course_type','lab')->orWhere('course_type','theory_lab'); })->count();
+
+        // If adding a theory or theory_lab, ensure theory count will not exceed 5
+        if (in_array($type, ['theory','theory_lab']) && $theoryCount >= 5) {
+            return back()->withInput()->with('error', 'Cannot add more theory courses for this semester (limit 5).');
+        }
+        // If adding a lab or theory_lab, ensure lab count will not exceed 4
+        if (in_array($type, ['lab','theory_lab']) && $labCount >= 4) {
+            return back()->withInput()->with('error', 'Cannot add more lab courses for this semester (limit 4).');
+        }
+
+        Course::create([
+            'course_code' => $request->input('course_code'),
+            'course_name' => $request->input('course_name'),
+            'credit_hours' => $request->input('credits'),
+            'description' => $request->input('description'),
+            'intended_semester' => $sem,
+            'course_type' => $type,
+            'is_active' => true,
+        ]);
+
         return redirect()->route('authority.courses')->with('success', 'Course created successfully.');
     }
     
@@ -391,11 +419,58 @@ class AuthorityController extends Controller
             'course_name' => 'required|string|max:200',
             'credits' => 'required|numeric|min:0|max:10',
             'description' => 'nullable|string',
+            'intended_semester' => 'required|integer|min:1|max:12',
+            'course_type' => 'required|in:theory,lab,theory_lab',
         ]);
-        
-        $course->update($request->all());
-        
+
+        $newSem = (int) $request->input('intended_semester');
+        $newType = $request->input('course_type');
+
+        // Enforce limits for target semester excluding this course itself
+        $theoryCount = Course::where('intended_semester', $newSem)
+            ->where(function($q){ $q->where('course_type','theory')->orWhere('course_type','theory_lab'); })
+            ->where('id','!=',$course->id)
+            ->count();
+        $labCount = Course::where('intended_semester', $newSem)
+            ->where(function($q){ $q->where('course_type','lab')->orWhere('course_type','theory_lab'); })
+            ->where('id','!=',$course->id)
+            ->count();
+
+        if (in_array($newType, ['theory','theory_lab']) && $theoryCount >= 5) {
+            return back()->withInput()->with('error', 'Cannot move/update: target semester already has maximum theory courses (5).');
+        }
+        if (in_array($newType, ['lab','theory_lab']) && $labCount >= 4) {
+            return back()->withInput()->with('error', 'Cannot move/update: target semester already has maximum lab courses (4).');
+        }
+
+        $course->update([
+            'course_code' => $request->input('course_code'),
+            'course_name' => $request->input('course_name'),
+            'credit_hours' => $request->input('credits'),
+            'description' => $request->input('description'),
+            'intended_semester' => $newSem,
+            'course_type' => $newType,
+        ]);
+
         return redirect()->route('authority.courses')->with('success', 'Course updated successfully.');
+    }
+
+    /**
+     * Delete a course (only if there are no semester offerings tied to it)
+     */
+    public function destroyCourse(Course $course)
+    {
+        // Prevent deletion if the course is attached to any semester offerings
+        if ($course->semesterCourses()->count() > 0) {
+            return back()->with('error', 'Cannot delete course: it is attached to one or more semester offerings.');
+        }
+
+        try {
+            $course->delete();
+            return redirect()->route('authority.courses')->with('success', 'Course deleted successfully.');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to delete course.');
+        }
     }
     
     // User Management
