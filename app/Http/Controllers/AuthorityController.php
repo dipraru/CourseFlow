@@ -28,14 +28,62 @@ class AuthorityController extends Controller
             'verified_payments' => PaymentSlip::where('payment_status', 'verified')->count(),
         ];
         
-        // Recent payment slips for verification
-        $recentPayments = PaymentSlip::with(['student.profile', 'semester'])
-            ->where('payment_status', 'paid')
-            ->latest()
+        // Recent payment slips approved by authority (verified)
+        $recentPayments = PaymentSlip::with(['student.profile', 'semester', 'verifiedBy'])
+            ->where('payment_status', 'verified')
+            ->latest('verified_at')
             ->take(10)
             ->get();
+
+        // Pending payment slips: students who received slip but haven't submitted payment
+    $pendingPayments = PaymentSlip::with(['student.profile', 'semester', 'verifiedBy'])
+            ->where('payment_status', 'unpaid')
+            ->latest()
+            ->take(20)
+            ->get();
         
-        return view('authority.dashboard', compact('stats', 'recentPayments', 'currentSemester'));
+        return view('authority.dashboard', compact('stats', 'recentPayments', 'currentSemester', 'pendingPayments'));
+    }
+
+    /**
+     * Approve a pending payment slip (mark as verified).
+     */
+    public function approvePayment(Request $request, PaymentSlip $paymentSlip)
+    {
+        // Only allow approving slips that are in 'paid' or 'unpaid' state that need authority action.
+        if (! in_array($paymentSlip->payment_status, ['paid', 'unpaid'])) {
+            return back()->with('error', 'This payment slip cannot be approved.');
+        }
+
+        $paymentSlip->update([
+            'payment_status' => 'verified',
+            'verified_at' => now(),
+            'verified_by' => auth()->id(),
+        ]);
+
+        return back()->with('success', 'Payment slip verified successfully.');
+    }
+
+    /**
+     * Reject a pending payment slip (mark as unpaid and add remarks).
+     */
+    public function rejectPayment(Request $request, PaymentSlip $paymentSlip)
+    {
+        $request->validate([
+            'rejection_reason' => 'required|string|max:500',
+        ]);
+
+        // Only allow rejecting slips that are awaiting verification
+        if (! in_array($paymentSlip->payment_status, ['paid', 'unpaid'])) {
+            return back()->with('error', 'This payment slip cannot be rejected.');
+        }
+
+        $paymentSlip->update([
+            'payment_status' => 'unpaid',
+            'payment_remarks' => $request->input('rejection_reason'),
+        ]);
+
+        return back()->with('success', 'Payment slip rejected and student notified.');
     }
     
     // Semester Management
