@@ -70,7 +70,12 @@
                     </tbody>
                 </table>
             </div>
-            <div class="p-3">{{ $courses->links() }}</div>
+            <div class="p-3">
+                <nav aria-label="Courses pagination">
+                    {{-- Use Bootstrap 5 pagination template and keep query string params --}}
+                    {{ $courses->withQueryString()->links('pagination::bootstrap-5') }}
+                </nav>
+            </div>
         @else
             <div class="p-4 text-center text-muted">No courses found.</div>
         @endif
