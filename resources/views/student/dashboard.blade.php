@@ -38,7 +38,7 @@
         <div class="d-flex justify-content-between align-items-start">
             <h2 class="mb-3">Welcome, {{ Auth::user()->name }}!</h2>
             <div>
-                <a href="{{ route('profile.edit') }}" class="btn btn-outline-primary btn-sm">Edit Profile</a>
+                <a href="{{ route('profile.edit') }}" class="btn btn-outline-primary btn-sm">View Profile</a>
             </div>
         </div>
         @if($currentSemester)

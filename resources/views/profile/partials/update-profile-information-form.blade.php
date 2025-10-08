@@ -28,16 +28,16 @@
             @endif
         </div>
 
-        <div>
+                <textarea id="address" name="address" class="mt-1 block w-full form-textarea">{{ old('address', optional($user->profile)->address) }}</textarea>
             <x-input-label for="phone" :value="__('Phone')" />
             <x-text-input id="phone" name="phone" type="text" class="mt-1 block w-full" :value="old('phone', optional($user->profile)->phone)" autocomplete="tel" />
             <x-input-error class="mt-2" :messages="$errors->get('phone')" />
         </div>
 
-        {{-- Address shown as read-only per new requirements --}}
         <div>
             <x-input-label for="address" :value="__('Address')" />
-            <div class="mt-1 p-2 bg-white border rounded">{{ old('address', optional($user->profile)->address) }}</div>
+            <textarea id="address" name="address" class="mt-1 block w-full form-textarea">{{ old('address', optional($user->profile)->address) }}</textarea>
+            <x-input-error class="mt-2" :messages="$errors->get('address')" />
         </div>
 
         @if(isset($batches) && $batches->count())

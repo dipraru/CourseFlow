@@ -15,6 +15,7 @@ class UserProfile extends Model
         'advisor_id',
         'phone',
         'address',
+        'roll_number',
         'gender',
         'father_name',
         'mother_name',
