@@ -99,9 +99,8 @@ class AuthorityController extends Controller
     
     public function createSemester()
     {
-        $courses = Course::orderBy('course_code')->get();
         $batches = Batch::orderBy('year','desc')->get();
-        return view('authority.semesters.create', compact('courses', 'batches'));
+        return view('authority.semesters.create', compact('batches'));
     }
     
     public function storeSemester(Request $request)
@@ -155,17 +154,17 @@ class AuthorityController extends Controller
 
             $createdSemester = Semester::create($data);
 
-            // If courses were selected, attach them as SemesterCourse entries
-            if ($request->filled('courses')) {
-                foreach ($request->input('courses') as $courseId) {
-                    SemesterCourse::create([
-                        'semester_id' => $createdSemester->id,
-                        'course_id' => $courseId,
-                        'max_students' => 60,
-                        'enrolled_students' => 0,
-                        'is_available' => true,
-                    ]);
-                }
+            // Automatically attach courses whose intended_semester matches the selected semester_number
+            $intended = (int) $request->input('semester_number');
+            $coursesToAttach = Course::where('intended_semester', $intended)->pluck('id')->toArray();
+            foreach ($coursesToAttach as $courseId) {
+                SemesterCourse::create([
+                    'semester_id' => $createdSemester->id,
+                    'course_id' => $courseId,
+                    'max_students' => 60,
+                    'enrolled_students' => 0,
+                    'is_available' => true,
+                ]);
             }
             
             DB::commit();
@@ -179,10 +178,9 @@ class AuthorityController extends Controller
     
     public function editSemester(Semester $semester)
     {
-        $courses = Course::orderBy('course_code')->get();
         $selected = $semester->semesterCourses()->pluck('course_id')->toArray();
         $batches = Batch::orderBy('year','desc')->get();
-        return view('authority.semesters.edit', compact('semester', 'courses', 'selected', 'batches'));
+        return view('authority.semesters.edit', compact('semester', 'selected', 'batches'));
     }
     
     public function updateSemester(Request $request, Semester $semester)
@@ -233,19 +231,19 @@ class AuthorityController extends Controller
 
             $semester->update($data);
 
-            // If courses were sent during update, sync semester courses (simple approach: remove existing and add new)
-            if ($request->has('courses')) {
-                // delete existing semester courses
-                $semester->semesterCourses()->delete();
-                foreach ($request->input('courses', []) as $courseId) {
-                    SemesterCourse::create([
-                        'semester_id' => $semester->id,
-                        'course_id' => $courseId,
-                        'max_students' => 60,
-                        'enrolled_students' => 0,
-                        'is_available' => true,
-                    ]);
-                }
+            // Sync semester courses automatically based on the new semester_number
+            $intended = (int) $request->input('semester_number');
+            // remove existing offerings
+            $semester->semesterCourses()->delete();
+            $coursesToAttach = Course::where('intended_semester', $intended)->pluck('id')->toArray();
+            foreach ($coursesToAttach as $courseId) {
+                SemesterCourse::create([
+                    'semester_id' => $semester->id,
+                    'course_id' => $courseId,
+                    'max_students' => 60,
+                    'enrolled_students' => 0,
+                    'is_available' => true,
+                ]);
             }
             
             DB::commit();
@@ -358,6 +356,20 @@ class AuthorityController extends Controller
 
         $courses = $query->withCount('semesterCourses')->orderBy('course_code')->paginate(20)->withQueryString();
         return view('authority.courses.index', compact('courses'));
+    }
+
+    /**
+     * Return JSON list of courses for a given intended semester number
+     */
+    public function coursesByIntendedSemester($number)
+    {
+        $num = (int) $number;
+        if ($num < 1 || $num > 12) {
+            return response()->json(['error' => 'Invalid semester number'], 400);
+        }
+
+        $courses = Course::where('intended_semester', $num)->orderBy('course_code')->get(['id','course_code','course_name','credit_hours','course_type']);
+        return response()->json($courses);
     }
     
     public function createCourse()

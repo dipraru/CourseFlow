@@ -94,14 +94,11 @@
 		<hr class="my-3">
 
 		<div class="mb-3">
-			<label class="form-label">Courses to include in this semester</label>
-			<select name="courses[]" class="form-select" multiple size="6">
-				@foreach($courses as $course)
-					<option value="{{ $course->id }}">{{ $course->course_code }} - {{ $course->course_name }}</option>
-				@endforeach
-			</select>
-			<small class="text-muted">Hold Ctrl (or Cmd) to select multiple courses.</small>
-			@error('courses')<div class="text-danger small">{{ $message }}</div>@enderror
+			<label class="form-label">Courses that will be included (auto-populated by semester number)</label>
+			<div id="auto-courses" class="border rounded p-2" style="min-height:120px; background:#f8f9fa;">
+				<div class="text-muted">Select a semester number above to see the courses that will be attached automatically.</div>
+			</div>
+			<small class="text-muted">Courses are auto-selected from the course catalog based on Intended Semester. You don't need to choose them manually.</small>
 		</div>
 
 		<div class="mt-4">
@@ -110,4 +107,39 @@
 		</div>
 	</form>
 </div>
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+	const semInput = document.querySelector('input[name="semester_number"]');
+	const autoDiv = document.getElementById('auto-courses');
+	function loadCourses(){
+		const val = semInput.value || 0;
+		if (!val || val < 1 || val > 12) {
+			autoDiv.innerHTML = '<div class="text-muted">Select a semester number above to see the courses that will be attached automatically.</div>';
+			return;
+		}
+		autoDiv.innerHTML = '<div class="text-muted">Loading courses...</div>';
+		fetch('{{ route("authority.courses.by_semester", ["number"=>":num"]) }}'.replace(':num', val))
+			.then(r => r.json())
+			.then(data => {
+				if (data && data.length) {
+					let html = '<ul class="list-unstyled mb-0">';
+					data.forEach(c => {
+						html += `<li>${c.course_code} — ${c.course_name} <small class="text-muted">(${c.course_type})</small></li>`;
+					});
+					html += '</ul>';
+					autoDiv.innerHTML = html;
+				} else {
+					autoDiv.innerHTML = '<div class="text-muted">No courses found for this semester.</div>';
+				}
+			}).catch(()=>{
+				autoDiv.innerHTML = '<div class="text-danger">Failed to load courses.</div>';
+			});
+	}
+	semInput.addEventListener('input', loadCourses);
+	// initial load
+	loadCourses();
+});
+</script>
+@endpush
 @endsection
