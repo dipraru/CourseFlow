@@ -14,6 +14,22 @@
 	<form action="{{ route('authority.semesters.store') }}" method="POST">
 		@csrf
 
+		@if(session('error'))
+		<div class="alert alert-danger">{{ session('error') }}</div>
+		@endif
+		@if(session('success'))
+		<div class="alert alert-success">{{ session('success') }}</div>
+		@endif
+		@if($errors->any())
+		<div class="alert alert-danger">
+			<ul class="mb-0">
+				@foreach($errors->all() as $err)
+					<li>{{ $err }}</li>
+				@endforeach
+			</ul>
+		</div>
+		@endif
+
 		<div class="mb-3">
 			<label class="form-label">Name</label>
 			<input type="text" name="name" value="{{ old('name') }}" class="form-control">
@@ -47,14 +63,10 @@
 
 		<div class="row g-3 mt-3">
 			<div class="col-md-6">
-				<label class="form-label">For Batch (optional)</label>
-				<select name="batch_id" class="form-select">
-					<option value="">All Batches</option>
-					@foreach($batches as $batch)
-						<option value="{{ $batch->id }}">{{ $batch->name }}</option>
-					@endforeach
-				</select>
-				@error('batch_id')<div class="text-danger small">{{ $message }}</div>@enderror
+				<label class="form-label">Batch Year (e.g. 2024)</label>
+				<input type="number" name="batch_year" value="{{ old('batch_year') }}" class="form-control" placeholder="Enter batch year">
+				<small class="text-muted">Specify the batch by its year. This creates the semester for that specific batch.</small>
+				@error('batch_year')<div class="text-danger small">{{ $message }}</div>@enderror
 			</div>
 		</div>
 
@@ -86,10 +98,7 @@
 			</div>
 		</div>
 
-		<div class="form-check form-switch mt-3">
-			<input class="form-check-input" type="checkbox" role="switch" id="is_current" name="is_current" value="1">
-			<label class="form-check-label" for="is_current">Mark as current semester</label>
-		</div>
+		{{-- is_current removed: semesters are auto-activated for the batch when created --}}
 
 		<hr class="my-3">
 

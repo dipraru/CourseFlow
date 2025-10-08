@@ -13,6 +13,8 @@ use App\Models\Batch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 class AuthorityController extends Controller
 {
@@ -58,7 +60,7 @@ class AuthorityController extends Controller
         $paymentSlip->update([
             'payment_status' => 'verified',
             'verified_at' => now(),
-            'verified_by' => auth()->id(),
+            'verified_by' => Auth::id(),
         ]);
 
         return back()->with('success', 'Payment slip verified successfully.');
@@ -89,20 +91,18 @@ class AuthorityController extends Controller
     // Semester Management
     public function semesters()
     {
-        // Include counts for semester courses and distinct student registrations (one student = one registration)
         $semesters = Semester::select('semesters.*', DB::raw('(select count(distinct student_id) from course_registrations where course_registrations.semester_id = semesters.id) as student_registrations_count'))
             ->withCount(['semesterCourses'])
             ->latest()
             ->paginate(15);
         return view('authority.semesters.index', compact('semesters'));
     }
-    
+
     public function createSemester()
     {
-        $batches = Batch::orderBy('year','desc')->get();
-        return view('authority.semesters.create', compact('batches'));
+        return view('authority.semesters.create');
     }
-    
+
     public function storeSemester(Request $request)
     {
         $request->validate([
@@ -110,49 +110,69 @@ class AuthorityController extends Controller
             'type' => 'required|in:Spring,Summer,Fall',
             'year' => 'required|integer|min:2020|max:2050',
             'semester_number' => 'required|integer|min:1',
-            'batch_id' => 'nullable|exists:batches,id',
+            'batch_year' => 'nullable|integer|min:2000|max:2100|exists:batches,year',
             'registration_start_date' => 'required|date',
             'registration_end_date' => 'required|date|after:registration_start_date',
             'semester_start_date' => 'required|date',
             'semester_end_date' => 'required|date|after:semester_start_date',
-            'is_current' => 'boolean',
             'courses' => 'nullable|array',
             'courses.*' => 'exists:courses,id',
         ]);
-        
+
+        // Prevent opening a duplicate semester for the same batch/year/number
+        $existingQuery = Semester::where('semester_number', $request->input('semester_number'))
+            ->where('year', $request->input('year'));
+        if ($request->filled('batch_year')) {
+            $batch = Batch::where('year', $request->input('batch_year'))->first();
+            $batchId = $batch?->id;
+            if (is_null($batchId)) {
+                // no such batch — validation should have prevented this, but guard anyway
+                return back()->withInput()->with('error', 'Selected batch year not found.');
+            }
+            $existingQuery->where('batch_id', $batchId);
+        } else {
+            $existingQuery->whereNull('batch_id');
+        }
+        if ($existingQuery->exists()) {
+            return back()->withInput()->with('error', 'A semester with the same year and number already exists for this batch.');
+        }
+
         DB::beginTransaction();
         try {
-            // If this semester is marked as current, unset others
-            if ($request->boolean('is_current')) {
-                Semester::where('is_current', true)->update(['is_current' => false]);
+            // Resolve batch_id from optional batch_year input
+            $batchId = null;
+            if ($request->filled('batch_year')) {
+                $batch = Batch::where('year', $request->input('batch_year'))->first();
+                if ($batch) {
+                    $batchId = $batch->id;
+                }
             }
 
             // Map request inputs to model columns
             $data = $request->only([
                 'name', 'type', 'year', 'semester_number',
-                'batch_id',
                 'registration_start_date', 'registration_end_date',
-                'semester_start_date', 'semester_end_date', 'is_current'
+                'semester_start_date', 'semester_end_date'
             ]);
+            // set batch_id if resolved
+            $data['batch_id'] = $batchId;
 
-            // If marked current, also mark as active for registration availability
-            if (!empty($data['is_current'])) {
-                $data['is_active'] = true;
-            }
-
-            // Auto-enable is_active if today's date falls within registration window
-            try {
-                $today = now()->toDateString();
-                if (!empty($data['registration_start_date']) && !empty($data['registration_end_date'])) {
-                    if ($data['registration_start_date'] <= $today && $today <= $data['registration_end_date']) {
-                        $data['is_active'] = true;
-                    }
-                }
-            } catch (\Throwable $e) {
-                // ignore date parse errors
-            }
+            // New behavior: created semester is automatically active and marked current for its batch
+            $data['is_active'] = true;
+            $data['is_current'] = true;
 
             $createdSemester = Semester::create($data);
+
+            // Deactivate and lock other semesters for the same batch
+            Semester::where('id', '<>', $createdSemester->id)
+                ->where(function($q) use ($createdSemester) {
+                    if (is_null($createdSemester->batch_id)) {
+                        $q->whereNull('batch_id');
+                    } else {
+                        $q->where('batch_id', $createdSemester->batch_id);
+                    }
+                })
+                ->update(['is_active' => false, 'is_current' => false, 'is_locked' => true]);
 
             // Automatically attach courses whose intended_semester matches the selected semester_number
             $intended = (int) $request->input('semester_number');
@@ -166,21 +186,22 @@ class AuthorityController extends Controller
                     'is_available' => true,
                 ]);
             }
-            
-            DB::commit();
-            return redirect()->route('authority.semesters')->with('success', 'Semester created successfully.');
-            
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return back()->with('error', 'Failed to create semester.')->withInput();
+
+                DB::commit();
+                return redirect()->route('authority.semesters')->with('success', 'Semester created successfully.');
+
+            } catch (\Exception $e) {
+                DB::rollBack();
+                \Log::error('Failed to create semester', ['exception' => $e->getMessage()]);
+                $msg = app()->environment('local') ? $e->getMessage() : 'Failed to create semester.';
+                return back()->with('error', $msg)->withInput();
+            }
         }
-    }
     
     public function editSemester(Semester $semester)
     {
         $selected = $semester->semesterCourses()->pluck('course_id')->toArray();
-        $batches = Batch::orderBy('year','desc')->get();
-        return view('authority.semesters.edit', compact('semester', 'selected', 'batches'));
+        return view('authority.semesters.edit', compact('semester', 'selected'));
     }
     
     public function updateSemester(Request $request, Semester $semester)
@@ -190,31 +211,56 @@ class AuthorityController extends Controller
             'type' => 'required|in:Spring,Summer,Fall',
             'year' => 'required|integer|min:2020|max:2050',
             'semester_number' => 'required|integer|min:1',
-            'batch_id' => 'nullable|exists:batches,id',
+            'batch_year' => 'nullable|integer|min:2000|max:2100|exists:batches,year',
             'registration_start_date' => 'required|date',
             'registration_end_date' => 'required|date|after:registration_start_date',
             'semester_start_date' => 'required|date',
             'semester_end_date' => 'required|date|after:semester_start_date',
-            'is_current' => 'boolean',
+            'courses' => 'nullable|array',
+            'courses.*' => 'exists:courses,id',
         ]);
-        
+
+        // Prevent creating a duplicate semester when updating: same batch/year/number
+        $existingQuery = Semester::where('semester_number', $request->input('semester_number'))
+            ->where('year', $request->input('year'))
+            ->where('id', '<>', $semester->id);
+        if ($request->filled('batch_year')) {
+            $batch = Batch::where('year', $request->input('batch_year'))->first();
+            $batchId = $batch?->id;
+            if (is_null($batchId)) {
+                return back()->withInput()->with('error', 'Selected batch year not found.');
+            }
+            $existingQuery->where('batch_id', $batchId);
+        } else {
+            $existingQuery->whereNull('batch_id');
+        }
+        if ($existingQuery->exists()) {
+            return back()->withInput()->with('error', 'A semester with the same year and number already exists for this batch.');
+        }
+
         DB::beginTransaction();
         try {
-            // If this semester is marked as current, unset others
-            if ($request->boolean('is_current') && !$semester->is_current) {
-                Semester::where('is_current', true)->update(['is_current' => false]);
+            // Resolve batch by provided year (if any)
+            $batchId = null;
+            if ($request->filled('batch_year')) {
+                $batch = Batch::where('year', $request->input('batch_year'))->first();
+                if ($batch) {
+                    $batchId = $batch->id;
+                }
             }
 
             $data = $request->only([
                 'name', 'type', 'year', 'semester_number',
-                'batch_id',
                 'registration_start_date', 'registration_end_date',
-                'semester_start_date', 'semester_end_date', 'is_current'
+                'semester_start_date', 'semester_end_date'
             ]);
+            $data['batch_id'] = $batchId;
 
-            // If semester is being marked current, also mark active
-            if (!empty($data['is_current'])) {
-                $data['is_active'] = true;
+            // If attempting to set is_active via update, ensure the semester is not locked
+            if (array_key_exists('is_active', $data) && $data['is_active']) {
+                if ($semester->is_locked) {
+                    return back()->with('error', 'This semester was previously deactivated and cannot be reactivated.');
+                }
             }
 
             // Auto-enable is_active if today's date falls within registration window
@@ -231,6 +277,22 @@ class AuthorityController extends Controller
 
             $semester->update($data);
 
+            // If this semester is active after update, mark it as current and deactivate/lock other semesters for the same batch
+            if (!empty($semester->is_active)) {
+                // mark this semester as current
+                $semester->update(['is_current' => true]);
+
+                Semester::where('id', '<>', $semester->id)
+                    ->where(function($q) use ($semester) {
+                        if (is_null($semester->batch_id)) {
+                            $q->whereNull('batch_id');
+                        } else {
+                            $q->where('batch_id', $semester->batch_id);
+                        }
+                    })
+                    ->update(['is_active' => false, 'is_current' => false, 'is_locked' => true]);
+            }
+
             // Sync semester courses automatically based on the new semester_number
             $intended = (int) $request->input('semester_number');
             // remove existing offerings
@@ -245,13 +307,15 @@ class AuthorityController extends Controller
                     'is_available' => true,
                 ]);
             }
-            
+
             DB::commit();
             return redirect()->route('authority.semesters')->with('success', 'Semester updated successfully.');
-            
+
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Failed to update semester.')->withInput();
+            \Log::error('Failed to update semester', ['exception' => $e->getMessage()]);
+            $msg = app()->environment('local') ? $e->getMessage() : 'Failed to update semester.';
+            return back()->with('error', $msg)->withInput();
         }
     }
 
@@ -259,13 +323,32 @@ class AuthorityController extends Controller
     {
         DB::beginTransaction();
         try {
-            // Set this semester as current and active (allow multiple current semesters)
-            $semester->update(['is_current' => true, 'is_active' => true]);
+            // Prevent activation if this semester has been locked (previously deactivated)
+            if ($semester->is_locked) {
+                return back()->with('error', 'This semester cannot be reactivated.');
+            }
+
+            // Set this semester as active. Deactivate and lock other semesters for the same batch only.
+            $semester->update(['is_active' => true]);
+
+            // mark as current for the batch
+            $semester->update(['is_current' => true]);
+
+            Semester::where('id', '<>', $semester->id)
+                ->where(function($q) use ($semester) {
+                    if (is_null($semester->batch_id)) {
+                        $q->whereNull('batch_id');
+                    } else {
+                        $q->where('batch_id', $semester->batch_id);
+                    }
+                })
+                ->update(['is_active' => false, 'is_current' => false, 'is_locked' => true]);
+
             DB::commit();
-            return back()->with('success', 'Semester marked as current successfully.');
+            return back()->with('success', 'Semester activated successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Failed to mark semester as current.');
+            return back()->with('error', 'Failed to activate semester.');
         }
     }
 

@@ -48,14 +48,10 @@
 
 			<div class="row g-3 mt-3">
 				<div class="col-md-6">
-					<label class="form-label">For Batch (optional)</label>
-					<select name="batch_id" class="form-select">
-						<option value="">All Batches</option>
-						@foreach($batches as $batch)
-							<option value="{{ $batch->id }}" {{ old('batch_id', $semester->batch_id) == $batch->id ? 'selected' : '' }}>{{ $batch->name }}</option>
-						@endforeach
-					</select>
-					@error('batch_id')<div class="text-danger small">{{ $message }}</div>@enderror
+					<label class="form-label">Batch Year (e.g. 2024)</label>
+					<input type="number" name="batch_year" value="{{ old('batch_year', optional($semester->batch)->year) }}" class="form-control" placeholder="Enter batch year">
+					<small class="text-muted">Specify the batch by its year. This semester will be associated with that batch.</small>
+					@error('batch_year')<div class="text-danger small">{{ $message }}</div>@enderror
 				</div>
 			</div>
 
@@ -87,10 +83,7 @@
 			</div>
 		</div>
 
-		<div class="form-check form-switch mt-3">
-			<input class="form-check-input" type="checkbox" role="switch" id="is_current" name="is_current" value="1" {{ $semester->is_current ? 'checked' : '' }}>
-			<label class="form-check-label" for="is_current">Mark as current semester</label>
-		</div>
+		{{-- is_current removed: semester activation is handled automatically for the batch --}}
 
 		<hr class="my-3">
 

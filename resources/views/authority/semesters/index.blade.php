@@ -73,14 +73,10 @@
                                                 </a>
                                             </td>
                                             <td class="text-end">
-                                            @if(!$semester->is_current)
-                                                <form action="{{ route('authority.semesters.activate', $semester) }}" method="POST" class="d-inline">
-                                                    @csrf
-                                                    @method('PATCH')
-                                                    <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('Mark this semester as current?')">Mark Current</button>
-                                                </form>
-                                            @else
+                                            @if($semester->is_current)
                                                 <span class="badge bg-success">Current</span>
+                                            @else
+                                                <span class="badge bg-secondary">Inactive</span>
                                             @endif
 
                                             @php $regCount = $semester->student_registrations_count ?? 0; @endphp
