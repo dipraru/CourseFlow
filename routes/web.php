@@ -83,6 +83,8 @@ Route::middleware(['auth', 'role:authority'])->prefix('authority')->name('author
     Route::post('/courses', [AuthorityController::class, 'storeCourse'])->name('courses.store');
     Route::patch('/courses/{course}', [AuthorityController::class, 'updateCourse'])->name('courses.update');
     Route::delete('/courses/{course}', [AuthorityController::class, 'destroyCourse'])->name('courses.destroy');
+    // JSON endpoint to fetch courses by intended semester (used in semester create/edit UI)
+    Route::get('/courses/by-semester/{number}', [AuthorityController::class, 'coursesByIntendedSemester'])->name('courses.by_semester');
     
     // User Management
     Route::get('/users', [AuthorityController::class, 'users'])->name('users');
