@@ -17,10 +17,56 @@
         @csrf
         @method('patch')
 
+        {{-- Name: show as read-only for students, editable for other roles --}}
         <div>
             <x-input-label for="name" :value="__('Name')" />
-            <x-text-input id="name" name="name" type="text" class="mt-1 block w-full" :value="old('name', $user->name)" required autofocus autocomplete="name" />
-            <x-input-error class="mt-2" :messages="$errors->get('name')" />
+            @if($user->isStudent())
+                <div class="mt-1 p-2 bg-white border rounded">{{ $user->name }}</div>
+            @else
+                <x-text-input id="name" name="name" type="text" class="mt-1 block w-full" :value="old('name', $user->name)" required autofocus autocomplete="name" />
+                <x-input-error class="mt-2" :messages="$errors->get('name')" />
+            @endif
+        </div>
+
+        <div>
+            <x-input-label for="phone" :value="__('Phone')" />
+            <x-text-input id="phone" name="phone" type="text" class="mt-1 block w-full" :value="old('phone', optional($user->profile)->phone)" autocomplete="tel" />
+            <x-input-error class="mt-2" :messages="$errors->get('phone')" />
+        </div>
+
+        {{-- Address shown as read-only per new requirements --}}
+        <div>
+            <x-input-label for="address" :value="__('Address')" />
+            <div class="mt-1 p-2 bg-white border rounded">{{ old('address', optional($user->profile)->address) }}</div>
+        </div>
+
+        @if(isset($batches) && $batches->count())
+        <div>
+            <x-input-label for="batch_id" :value="__('Batch')" />
+            {{-- Batch is not editable by students; show current value as read-only --}}
+            <div class="mt-1 p-2 bg-white border rounded">{{ optional($user->profile)->batch?->name ?? 'Not assigned' }}</div>
+        </div>
+        @endif
+
+        {{-- Additional personal fields (readonly) --}}
+        <div>
+            <x-input-label for="gender" :value="__('Gender')" />
+            <div class="mt-1 p-2 bg-white border rounded">{{ optional($user->profile)->gender ?? '-' }}</div>
+        </div>
+
+        <div>
+            <x-input-label for="father_name" :value="__('Father\'s Name')" />
+            <div class="mt-1 p-2 bg-white border rounded">{{ optional($user->profile)->father_name ?? '-' }}</div>
+        </div>
+
+        <div>
+            <x-input-label for="mother_name" :value="__('Mother\'s Name')" />
+            <div class="mt-1 p-2 bg-white border rounded">{{ optional($user->profile)->mother_name ?? '-' }}</div>
+        </div>
+
+        <div>
+            <x-input-label for="date_of_birth" :value="__('Date of Birth')" />
+            <div class="mt-1 p-2 bg-white border rounded">{{ optional($user->profile)->date_of_birth ? optional($user->profile)->date_of_birth->format('Y-m-d') : '-' }}</div>
         </div>
 
         <div>
@@ -62,3 +108,4 @@
         </div>
     </form>
 </section>
+

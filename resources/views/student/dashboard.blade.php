@@ -23,13 +23,24 @@
             <span>My Registrations</span>
         </a>
     </li>
+    <li class="nav-item">
+        <a href="{{ route('profile.edit') }}" class="nav-link">
+            <i class="bi bi-person-circle"></i>
+            <span>My Profile</span>
+        </a>
+    </li>
 </ul>
 @endsection
 
 @section('content')
 <div class="row mb-4">
     <div class="col-12">
-        <h2 class="mb-3">Welcome, {{ Auth::user()->name }}!</h2>
+        <div class="d-flex justify-content-between align-items-start">
+            <h2 class="mb-3">Welcome, {{ Auth::user()->name }}!</h2>
+            <div>
+                <a href="{{ route('profile.edit') }}" class="btn btn-outline-primary btn-sm">Edit Profile</a>
+            </div>
+        </div>
         @if($currentSemester)
             <div class="alert alert-info alert-modern">
                 <i class="bi bi-info-circle-fill me-2"></i>
