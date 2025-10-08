@@ -97,11 +97,16 @@ class DepartmentHeadController extends Controller
                 // Get fee structure
                 // Some installations may not yet have the fees.batch_id column (migration pending).
                 // Check the schema and fall back to a semester-only fee when batch_id is not available.
+                $fee = null;
                 if (Schema::hasColumn('fees', 'batch_id') && !empty($student->profile->batch_id)) {
+                    // Try batch-specific fee first
                     $fee = Fee::where('batch_id', $student->profile->batch_id)
                         ->where('semester_id', $semester->id)
                         ->first();
-                } else {
+                }
+                
+                // Always fall back to a semester-level fee when batch-specific fee is not found
+                if (! $fee) {
                     $fee = Fee::where('semester_id', $semester->id)->first();
                 }
                 
